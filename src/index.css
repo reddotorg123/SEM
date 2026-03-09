@@ -40,10 +40,8 @@
         @apply font-sans antialiased bg-slate-50 text-slate-900 dark:bg-[#0f172a] dark:text-gray-100;
         /* Smooth font rendering */
         -moz-osx-font-smoothing: grayscale;
-        /* Better touch scrolling on iOS */
-        -webkit-overflow-scrolling: touch;
-        min-height: 100vh;
         min-height: -webkit-fill-available;
+        min-height: 100vh;
         padding-top: var(--safe-area-top);
         padding-bottom: var(--safe-area-bottom);
     }
@@ -117,6 +115,12 @@
         @apply block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1.5 ml-1;
     }
 
+    @media (max-width: 640px) {
+        .label {
+            @apply text-xs mb-1;
+        }
+    }
+
     /* Badge Styles */
     .badge {
         @apply inline-flex items-center px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider shadow-sm;
@@ -168,8 +172,20 @@
         @apply w-full px-6 py-4 bg-slate-50 dark:bg-slate-950 border-2 border-slate-100 dark:border-slate-800 rounded-2xl text-slate-900 dark:text-white font-bold tracking-tight focus:outline-none focus:border-indigo-600 focus:ring-4 focus:ring-indigo-500/10 placeholder-slate-300 dark:placeholder-slate-700 transition-all duration-300;
     }
 
+    @media (max-width: 640px) {
+        .input-premium {
+            @apply px-4 py-3 rounded-xl text-sm;
+        }
+    }
+
     .label-premium {
         @apply block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em] mb-2 ml-4;
+    }
+
+    @media (max-width: 640px) {
+        .label-premium {
+            @apply text-[9px] mb-1.5 ml-3 tracking-[0.15em];
+        }
     }
 
     .custom-scrollbar::-webkit-scrollbar {

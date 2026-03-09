@@ -147,12 +147,12 @@ const EventCard = React.memo(({ event, compact = false }) => {
             whileHover={{ y: -4 }}
             onClick={handleClick}
             className={cn(
-                "group relative bg-white dark:bg-slate-900 rounded-xl sm:rounded-2xl cursor-pointer border transition-all duration-300 shadow-sm hover:shadow-xl hover:shadow-indigo-500/10 overflow-hidden flex flex-col sm:flex-row h-full min-h-0 sm:min-h-[16rem]",
+                "group relative bg-white dark:bg-slate-900 rounded-xl sm:rounded-2xl cursor-pointer border transition-all duration-300 shadow-sm hover:shadow-xl hover:shadow-indigo-500/10 overflow-hidden flex flex-col sm:flex-row h-full min-h-0 sm:min-h-[14rem]",
                 isPinned ? "border-indigo-500/30 ring-2 ring-indigo-500/10" : "border-slate-100 dark:border-slate-800 hover:border-indigo-500/20"
             )}
         >
             {/* Left: Poster Image */}
-            <div className={cn("relative w-full sm:shrink-0 h-36 sm:h-auto overflow-hidden bg-slate-100 dark:bg-slate-800", compact ? "sm:w-40" : "sm:w-56 md:w-64")}>
+            <div className={cn("relative w-full sm:shrink-0 h-32 sm:h-auto overflow-hidden bg-slate-100 dark:bg-slate-800", compact ? "sm:w-32" : "sm:w-48 md:w-56 lg:w-64")}>
                 <PosterImage event={event} statusConfig={statusConfig} />
 
                 {/* Priority Score Overlay */}
@@ -183,7 +183,7 @@ const EventCard = React.memo(({ event, compact = false }) => {
             </div>
 
             {/* Right: Content */}
-            <div className="flex-1 p-4 sm:p-6 flex flex-col justify-between min-w-0">
+            <div className="flex-1 p-3 sm:p-5 md:p-6 flex flex-col justify-between min-w-0">
 
                 {/* Header Row: Type + Actions */}
                 <div className="flex items-start justify-between mb-2">
@@ -278,7 +278,7 @@ const EventCard = React.memo(({ event, compact = false }) => {
 
                 {/* Description Snippet or Eligibility */}
                 {(event.eligibility || event.description) && (
-                    <div className="mb-4 p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800">
+                    <div className="mb-3 sm:mb-4 p-2 sm:p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800">
                         {event.eligibility ? (
                             <div className="flex items-start gap-2">
                                 <ShieldCheck size={12} className="text-indigo-500 mt-0.5 shrink-0" />

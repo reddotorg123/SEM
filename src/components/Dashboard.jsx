@@ -145,7 +145,7 @@ const Dashboard = () => {
             className="pb-28 pt-4 sm:pt-8"
         >
             {/* Command Central Header */}
-            <div className="relative mb-8 sm:mb-16 overflow-hidden bg-slate-900 rounded-2xl sm:rounded-[3rem] p-5 sm:p-8 md:p-12 shadow-[0_32px_80px_-20px_rgba(15,23,42,0.5)] group">
+            <div className="relative mb-6 sm:mb-16 overflow-hidden bg-slate-900 rounded-xl sm:rounded-[3rem] p-4 sm:p-8 md:p-12 shadow-[0_32px_80px_-20px_rgba(15,23,42,0.5)] group">
                 {/* Background FX */}
                 <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-indigo-600/20 blur-[120px] rounded-full translate-x-1/2 -translate-y-1/2 animate-pulse" />
                 <div className="absolute bottom-0 left-0 w-64 h-64 bg-violet-600/10 blur-[80px] rounded-full -translate-x-1/4 translate-y-1/4" />
@@ -160,10 +160,10 @@ const Dashboard = () => {
                             <Target size={12} className="text-indigo-400" />
                             Command Center
                         </motion.div>
-                        <h1 className="text-2xl sm:text-4xl md:text-6xl font-black text-white mb-2 sm:mb-4 tracking-tighter leading-none">
+                        <h1 className="text-xl sm:text-4xl md:text-6xl font-black text-white mb-1 sm:mb-4 tracking-tighter leading-none">
                             Hello, <span className="bg-gradient-to-r from-indigo-400 to-violet-400 bg-clip-text text-transparent">{(user?.displayName || 'Operator').split(' ')[0]}</span>
                         </h1>
-                        <p className="text-sm sm:text-lg text-slate-400 font-medium max-w-xl leading-relaxed">
+                        <p className="text-xs sm:text-lg text-slate-400 font-medium max-w-xl leading-relaxed">
                             {criticalDeadlines.length > 0
                                 ? `You have ${criticalDeadlines.length} events with deadlines approaching this week.`
                                 : "Your event tracker is up to date. No urgent deadlines at the moment."}

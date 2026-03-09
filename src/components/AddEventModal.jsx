@@ -209,7 +209,7 @@ const AddEventModal = () => {
                     <form id="add-event-form" onSubmit={handleSubmit}>
                         <div className={cn("space-y-6 sm:space-y-10", activeTab === 'basic' ? 'block' : 'hidden')}>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-10">
-                                <div className="space-y-6">
+                                <div className="space-y-4 sm:space-y-6">
                                     <div className="form-group">
                                         <label className="label-premium">Event Name</label>
                                         <input type="text" name="eventName" value={formData.eventName} onChange={handleChange} required={activeTab === 'basic'} className="input-premium" placeholder="e.g. Hackfest 2026" />
@@ -218,7 +218,7 @@ const AddEventModal = () => {
                                         <label className="label-premium">College Name</label>
                                         <input type="text" name="collegeName" value={formData.collegeName} onChange={handleChange} required={activeTab === 'basic'} className="input-premium" placeholder="Host College Name" />
                                     </div>
-                                    <div className="grid grid-cols-2 gap-4">
+                                    <div className="grid grid-cols-2 gap-3 sm:gap-4">
                                         <div className="form-group">
                                             <label className="label-premium">Event Type</label>
                                             <select name="eventType" value={formData.eventType} onChange={handleChange} required={activeTab === 'basic'} className="input-premium">
@@ -237,19 +237,19 @@ const AddEventModal = () => {
                                         )}
                                     </div>
                                 </div>
-                                <div className="bg-slate-50 dark:bg-slate-800/40 p-10 rounded-[2.5rem] border-2 border-dashed border-slate-200 dark:border-slate-800 relative group">
-                                    <div className="absolute top-8 right-8 text-indigo-200 opacity-20 group-hover:rotate-12 transition-transform duration-700">
-                                        <Calendar size={120} />
+                                <div className="bg-slate-50 dark:bg-slate-800/40 p-6 sm:p-10 rounded-2xl sm:rounded-[2.5rem] border-2 border-dashed border-slate-200 dark:border-slate-800 relative group">
+                                    <div className="absolute top-4 right-4 sm:top-8 sm:right-8 text-indigo-200 opacity-20 group-hover:rotate-12 transition-transform duration-700">
+                                        <Calendar size={80} className="sm:w-[120px] sm:h-[120px]" />
                                     </div>
-                                    <h4 className="flex items-center gap-3 text-[11px] font-black uppercase tracking-[0.3em] text-indigo-600 mb-8">
+                                    <h4 className="flex items-center gap-3 text-[10px] sm:text-[11px] font-black uppercase tracking-[0.2em] sm:tracking-[0.3em] text-indigo-600 mb-4 sm:mb-8">
                                         <Clock size={16} strokeWidth={3} /> Event Schedule
                                     </h4>
-                                    <div className="space-y-6 relative z-10">
+                                    <div className="space-y-4 sm:space-y-6 relative z-10">
                                         <div className="form-group">
                                             <label className="label-premium">Registration Deadline</label>
                                             <input type="date" name="registrationDeadline" value={formData.registrationDeadline} onChange={handleChange} required={activeTab === 'basic'} className="input-premium bg-white dark:bg-slate-900" />
                                         </div>
-                                        <div className="grid grid-cols-2 gap-4">
+                                        <div className="grid grid-cols-2 gap-3 sm:gap-4">
                                             <div className="form-group">
                                                 <label className="label-premium">Start Date</label>
                                                 <input type="date" name="startDate" value={formData.startDate} onChange={handleChange} required={activeTab === 'basic'} className="input-premium bg-white dark:bg-slate-900" />
