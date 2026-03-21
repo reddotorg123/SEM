@@ -117,20 +117,22 @@ const Header = () => {
                                 <button
                                     onClick={() => setIsProfileOpen(!isProfileOpen)}
                                     className={cn(
-                                        "w-10 h-10 rounded-xl flex items-center justify-center transition-all hover:scale-105 active:scale-95 group relative border overflow-hidden",
+                                        "w-10 h-10 rounded-xl flex items-center justify-center transition-all hover:scale-105 active:scale-95 group relative border",
                                         userRole !== 'public' 
                                             ? "bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800 shadow-[0_0_20px_rgba(245,158,11,0.2)]" 
                                             : "bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 border-indigo-100 dark:border-indigo-800"
                                     )}
                                 >
-                                    {user?.photoURL ? (
-                                        <img src={user.photoURL} alt="Profile" className="w-full h-full object-cover" />
-                                    ) : (
-                                        <User size={20} />
-                                    )}
+                                    <div className="w-full h-full rounded-xl overflow-hidden flex items-center justify-center">
+                                        {user?.photoURL ? (
+                                            <img src={user.photoURL} alt="Profile" className="w-full h-full object-cover" />
+                                        ) : (
+                                            <User size={20} />
+                                        )}
+                                    </div>
                                     {userRole !== 'public' && (
-                                        <div className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-gradient-to-tr from-amber-400 to-amber-600 rounded-lg flex items-center justify-center shadow-lg border-2 border-white dark:border-slate-900 group-hover:rotate-12 transition-transform z-10">
-                                            <Crown size={10} className="text-white fill-current" />
+                                        <div className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-gradient-to-tr from-amber-400 to-amber-600 rounded-full flex items-center justify-center shadow-lg border-2 border-white dark:border-slate-900 group-hover:rotate-12 transition-transform z-10">
+                                            <Crown size={12} className="text-white fill-current" />
                                         </div>
                                     )}
                                 </button>

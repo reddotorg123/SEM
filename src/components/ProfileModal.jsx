@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, User, Briefcase, Save, Loader2, CheckCircle2 } from 'lucide-react';
+import { X, User, Briefcase, Save, Loader2, CheckCircle2, Crown } from 'lucide-react';
 import { useAppStore } from '../store';
 import { updateUserProfile } from '../services/firebase';
 import { updateProfile as updateAuthProfile } from 'firebase/auth';
@@ -10,6 +10,7 @@ const ProfileModal = () => {
     const isOpen = useAppStore((state) => state.modals.profile);
     const closeModal = useAppStore((state) => state.closeModal);
     const user = useAppStore((state) => state.user);
+    const userRole = useAppStore((state) => state.userRole);
     const setUser = useAppStore((state) => state.setUser);
 
     const userProfile = useAppStore((state) => state.userProfile);
@@ -141,13 +142,18 @@ const ProfileModal = () => {
                         {/* Profile Photo Upload */}
                         <div className="flex flex-col items-center justify-center space-y-3 mb-6">
                             <div className="relative">
-                                <div className="w-24 h-24 rounded-full bg-slate-100 dark:bg-slate-800 border-4 border-white dark:border-slate-900 shadow-xl overflow-hidden flex items-center justify-center">
+                                <div className="w-24 h-24 rounded-full bg-slate-100 dark:bg-slate-800 border-4 border-white dark:border-slate-900 shadow-xl overflow-hidden flex items-center justify-center relative">
                                     {photoURL ? (
                                         <img src={photoURL} alt="Profile" className="w-full h-full object-cover" />
                                     ) : (
                                         <User size={40} className="text-slate-300 dark:text-slate-600" />
                                     )}
                                 </div>
+                                {userRole !== 'public' && (
+                                    <div className="absolute top-0 right-0 w-8 h-8 bg-gradient-to-tr from-amber-400 to-amber-600 rounded-full flex items-center justify-center shadow-lg border-2 border-white dark:border-slate-900 z-10 animate-bounce-subtle">
+                                        <Crown size={16} className="text-white fill-current" />
+                                    </div>
+                                )}
                                 <label className="absolute bottom-0 right-0 w-8 h-8 bg-indigo-600 rounded-full flex items-center justify-center text-white cursor-pointer hover:scale-110 transition-transform shadow-lg shadow-indigo-500/30 border-2 border-white dark:border-slate-900">
                                     <input type="file" accept="image/*" onChange={handlePhotoChange} className="hidden" />
                                     <span className="text-sm font-black">+</span>
