@@ -162,23 +162,7 @@ const Dashboard = () => {
                             </div>
                             {userRole === 'public' ? 'PUBLIC' : 'TEAM'} EDITION • {userRole?.replace('_', ' ') || 'PERSONAL'} COMMAND
                         </motion.div>
-                        <div className="flex items-center gap-6 mb-4">
-                            <div className="relative group">
-                                {user?.photoURL ? (
-                                    <div className="w-16 h-16 rounded-3xl overflow-hidden border-2 border-indigo-500 shadow-2xl relative">
-                                        <img src={user.photoURL} alt="User Avatar" className="w-full h-full object-cover" />
-                                    </div>
-                                ) : (
-                                    <div className="w-16 h-16 bg-white/10 backdrop-blur-md rounded-3xl flex items-center justify-center border border-white/20 relative">
-                                        <User className="text-white" size={32} />
-                                    </div>
-                                )}
-                                {userRole !== 'public' && (
-                                    <div className="absolute -top-2 -right-2 w-8 h-8 bg-gradient-to-tr from-amber-400 to-amber-600 rounded-full flex items-center justify-center shadow-lg border-2 border-[#0a0c16] z-20 animate-bounce-subtle">
-                                        <Crown size={16} className="text-white fill-current" />
-                                    </div>
-                                )}
-                            </div>
+                        <div className="flex flex-col gap-4 mb-4">
                             <h1 className="text-5xl sm:text-7xl font-black text-white tracking-tight leading-none">
                                 Hello, <span className="bg-gradient-to-r from-indigo-400 to-indigo-200 bg-clip-text text-transparent">{(user?.displayName || 'JD').split(' ')[0]}</span>
                             </h1>
