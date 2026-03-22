@@ -23,3 +23,11 @@ dist-ssr
 *.sln
 *.sw?
 .vercel
+
+# Build logs and temp files
+_diff.txt
+build_attempt.txt
+build_current.txt
+build_log.txt
+build_output.txt
+build_output_clean.txt
