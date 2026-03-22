@@ -277,3 +277,4 @@ For issues or questions, check the Settings page for app info.
 ---
 
 **Built with ❤️ for engineering students who deserve better than Excel**
+
