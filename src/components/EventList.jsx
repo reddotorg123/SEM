@@ -1,7 +1,7 @@
 import React, { useMemo, useCallback, useState, useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { motion, AnimatePresence } from 'framer-motion';
-import { db, EventType, EventStatus, exportEventsToCSV } from '../db';
+import { db, EventType, EventStatus, getAllEvents } from '../db';
 import { useAppStore } from '../store';
 import EventCard from './EventCard';
 import { Search, Filter, SortDesc, SlidersHorizontal, ArrowUpDown, Table as TableIcon, LayoutGrid, FileSpreadsheet, ChevronRight, MapPin, Calendar, Clock, Trophy, Zap, ArrowUp, Heart, Terminal, Cpu, Database, Binary, Shield, ExternalLink, Globe } from 'lucide-react';
@@ -255,7 +255,7 @@ const EventList = () => {
                 <div className="flex items-center gap-3">
                     <button
                         onClick={async () => {
-                            const data = await exportEventsToCSV();
+                            const data = await getAllEvents();
                             downloadCSV(exportToCSV(data), `grid-export-${Date.now()}.csv`);
                         }}
                         className="px-6 h-14 bg-emerald-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest flex items-center gap-3 shadow-xl shadow-emerald-500/20 hover:scale-105 active:scale-95 transition-all"

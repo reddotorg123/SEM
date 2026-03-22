@@ -14,7 +14,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { db, updateAllEventStatuses } from './db';
 import { useAppStore } from './store';
 import { initNotificationSystem } from './notifications';
-import { initFirebase, subscribeToEvents, getUserData } from './services/firebase';
+import { initFirebase, getUserData } from './services/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { cn } from './utils';
 

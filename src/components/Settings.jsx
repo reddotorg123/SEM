@@ -1,6 +1,6 @@
 import React from 'react';
 import { useAppStore } from '../store';
-import { db, exportEventsToCSV } from '../db';
+import { db, getAllEvents } from '../db';
 import { exportToCSV, downloadCSV } from '../csvUtils';
 import { requestNotificationPermission } from '../notifications';
 import { bulkSyncToFirestore, getAllUsers, updateUserRole, getPaymentRequests, approvePaymentRequest, rejectPaymentRequest } from '../services/firebase';
@@ -105,7 +105,7 @@ const Settings = () => {
 
     const handleExport = async () => {
         try {
-            const events = await exportEventsToCSV();
+            const events = await getAllEvents();
             const csv = exportToCSV(events);
             downloadCSV(csv, `events-export-${new Date().toISOString().split('T')[0]}.csv`);
         } catch (error) {
