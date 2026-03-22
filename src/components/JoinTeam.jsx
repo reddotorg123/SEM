@@ -42,11 +42,8 @@ const JoinTeam = () => {
             return;
         }
 
-        if (userRole === 'public') {
-            setErrorMsg("Team Edition Required. Only paid subscribers can join teams. Please upgrade your account from the Command Center first.");
-            setStatus('error');
-            return;
-        }
+        // Public users ARE allowed to join teams (they become 'member')
+        // if (userRole === 'public') { ... removed this barrier ... }
 
         if (userRole === 'team_leader' || userRole === 'admin') {
             setErrorMsg("You are already a Team Leader or Admin. You cannot join another team.");

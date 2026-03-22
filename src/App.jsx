@@ -190,30 +190,49 @@ function App() {
     useEffect(() => {
         if (isLoading || !user || cloudProvider !== 'firestore') return;
 
-        let unsubscribeSync = () => { };
+        let unsubscribeGlobal = () => { };
+        let unsubscribeTeamStats = () => { };
 
-        try {
-            const firebaseData = initFirebase(firebaseConfig);
-            if (!firebaseData) return;
+        const startSync = async () => {
+            try {
+                const { 
+                    subscribeToGlobalEvents, 
+                    subscribeToTeamEventData 
+                } = await import('./services/firebase');
 
-            console.log('[Sync] Starting real-time sync...');
+                console.log('[Sync] Starting dual-channel real-time sync...');
 
-            unsubscribeSync = subscribeToEvents(
-                async (remoteEvents) => {
-                    const { bulkImportEvents } = await import('./db');
-                    await bulkImportEvents(remoteEvents, true);
-                },
-                (error) => {
-                    console.error('[Sync] Firestore listener failed:', error.message);
-                },
-                teamId,
-                userRole
-            );
-        } catch (error) {
-            console.error('[Sync] Setup crash:', error);
-        }
+                // 1. Sync Shared Events Catalog
+                unsubscribeGlobal = subscribeToGlobalEvents(
+                    async (remoteEvents) => {
+                        const { bulkImportEvents } = await import('./db');
+                        await bulkImportEvents(remoteEvents, true);
+                    },
+                    (error) => console.error('[Sync] Global events failed:', error)
+                );
 
-        return () => unsubscribeSync();
+                // 2. Sync Private Team Performance Data
+                if (teamId) {
+                    unsubscribeTeamStats = subscribeToTeamEventData(
+                        teamId,
+                        async (statsMap) => {
+                            const { bulkImportTeamEventData } = await import('./db');
+                            await bulkImportTeamEventData(statsMap, teamId);
+                        },
+                        (error) => console.error('[Sync] Team performance sync failed:', error)
+                    );
+                }
+            } catch (error) {
+                console.error('[Sync] Setup crash:', error);
+            }
+        };
+
+        startSync();
+
+        return () => {
+            unsubscribeGlobal();
+            unsubscribeTeamStats();
+        };
     }, [isLoading, user, cloudProvider, firebaseConfig, teamId, userRole]);
 
     /**

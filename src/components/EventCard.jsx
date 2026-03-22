@@ -179,7 +179,14 @@ const EventCard = React.memo(({ event, compact = false }) => {
                         <button onClick={(e) => { e.stopPropagation(); togglePinnedEvent(event.id); }} className={cn("p-1.5 rounded-lg transition-colors", isPinned ? "text-indigo-600 bg-indigo-50" : "text-slate-400 hover:bg-slate-100")}>
                             <Pin size={14} fill={isPinned ? "currentColor" : "none"} />
                         </button>
-                        <button onClick={(e) => { e.stopPropagation(); updateEvent(event.id, { isShortlisted: !event.isShortlisted }); }} className={cn("p-1.5 rounded-lg transition-colors", event.isShortlisted ? "text-rose-500 bg-rose-50" : "text-slate-400 hover:bg-slate-100")}>
+                        <button 
+                            onClick={async (e) => { 
+                                e.stopPropagation(); 
+                                const { updateTeamEventStatus } = await import('../db');
+                                await updateTeamEventStatus(event.serverId || event.id, { isShortlisted: !event.isShortlisted }); 
+                            }} 
+                            className={cn("p-1.5 rounded-lg transition-colors", event.isShortlisted ? "text-rose-500 bg-rose-50" : "text-slate-400 hover:bg-slate-100")}
+                        >
                             <Heart size={14} fill={event.isShortlisted ? "currentColor" : "none"} />
                         </button>
                         {canEdit && (

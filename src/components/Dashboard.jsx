@@ -92,8 +92,11 @@ const Dashboard = () => {
         }
     }, [teamId]);
 
-    // Live data from Dexie
-    const events = useLiveQuery(() => db.events.toArray(), []) || [];
+    // Live data from Dexie (Merged with Team Stats)
+    const events = useLiveQuery(async () => {
+        const { getMergedEvents } = await import('../db');
+        return await getMergedEvents();
+    }, [teamId]) || [];
 
     // Dashboard Statistics with useMemo
     const upcomingEvents = useMemo(() => {

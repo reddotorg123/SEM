@@ -70,6 +70,17 @@ export const checkDueNotifications = async (events) => {
 
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const oneWeekFromNow = new Date(today);
+    oneWeekFromNow.setDate(oneWeekFromNow.getDate() + 7);
+
+    // Filter events with deadlines in the next 7 days
+    const upcomingEvents = events.filter(event => {
+        const deadline = new Date(event.registrationDeadline);
+        const deadlineDate = new Date(deadline.getFullYear(), deadline.getMonth(), deadline.getDate());
+        return deadlineDate >= today && deadlineDate <= oneWeekFromNow;
+    });
+
+    if (upcomingEvents.length === 0) return;
 
     // Load shown notifications from localStorage to prevent duplicates
     const shownNotifications = JSON.parse(localStorage.getItem('shown_notifications') || '{}');
@@ -81,48 +92,30 @@ export const checkDueNotifications = async (events) => {
         shownNotifications.tags = [];
     }
 
-    events.forEach(event => {
-        const deadline = new Date(event.registrationDeadline);
-        const deadlineDate = new Date(deadline.getFullYear(), deadline.getMonth(), deadline.getDate());
-        const startDate = new Date(event.startDate);
-        const startDateOnly = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+    // Check if we already showed the summary today
+    const summaryTag = `summary-${todayKey}`;
+    if (shownNotifications.tags.includes(summaryTag)) return;
 
-        const daysUntilDeadline = Math.ceil((deadlineDate - today) / (1000 * 60 * 60 * 24));
-        const daysUntilEvent = Math.ceil((startDateOnly - today) / (1000 * 60 * 60 * 24));
-
-        // Deadline reminders
-        if (preferences.deadlineReminderDays.includes(daysUntilDeadline)) {
-            const tag = `deadline-${event.id}-${daysUntilDeadline}`;
-            if (!shownNotifications.tags.includes(tag)) {
-                showNotification(
-                    `Deadline ${daysUntilDeadline === 0 ? 'Today' : `in ${daysUntilDeadline} day(s)`}`,
-                    {
-                        body: `${event.eventName} - ${event.collegeName}`,
-                        tag: tag,
-                        data: { eventId: event.id, type: 'deadline' }
-                    }
-                );
-                shownNotifications.tags.push(tag);
-            }
-        }
-
-        // Event start reminders
-        if (preferences.eventReminderDays.includes(daysUntilEvent)) {
-            const tag = `event-${event.id}-${daysUntilEvent}`;
-            if (!shownNotifications.tags.includes(tag)) {
-                showNotification(
-                    `Event ${daysUntilEvent === 0 ? 'Today' : `in ${daysUntilEvent} day(s)`}`,
-                    {
-                        body: `${event.eventName} starts ${daysUntilEvent === 0 ? 'today' : `in ${daysUntilEvent} day(s)`}`,
-                        tag: tag,
-                        data: { eventId: event.id, type: 'event' }
-                    }
-                );
-                shownNotifications.tags.push(tag);
-            }
-        }
+    // Build the notification body
+    let body = 'Upcoming Deadlines:\n';
+    upcomingEvents.forEach(event => {
+        const dDate = new Date(event.registrationDeadline).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+        const sDate = new Date(event.startDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+        body += `• ${event.eventName}: Due ${dDate} | Event ${sDate}\n`;
     });
 
+    // Show a single aggregated notification
+    showNotification(
+        `${upcomingEvents.length} Event Deadlines This Week`,
+        {
+            body: body.trim(),
+            tag: summaryTag,
+            requireInteraction: true,
+            data: { type: 'summary', count: upcomingEvents.length }
+        }
+    );
+
+    shownNotifications.tags.push(summaryTag);
     localStorage.setItem('shown_notifications', JSON.stringify(shownNotifications));
 };
 

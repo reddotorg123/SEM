@@ -135,7 +135,10 @@ const EventList = () => {
 
     const scrollToTop = () => window.scrollTo({ top: 0, behavior: 'smooth' });
 
-    const events = useLiveQuery(() => db.events.toArray(), []);
+    const events = useLiveQuery(async () => {
+        const { getMergedEvents } = await import('../db');
+        return await getMergedEvents();
+    }, [filters.showShortlisted]); 
 
     const filteredEvents = useMemo(() => {
         if (!events) return [];

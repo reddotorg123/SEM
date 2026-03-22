@@ -106,10 +106,41 @@ const EventDetailsModal = () => {
     const isRoleVerified = useAppStore((state) => state.isRoleVerified);
     const canManage = (userRole === 'admin' || userRole === 'event_manager') && isRoleVerified;
 
-    const event = useLiveQuery(
+    const eventRaw = useLiveQuery(
         () => selectedEvent ? db.events.get(selectedEvent) : null,
         [selectedEvent]
     );
+
+    const teamData = useLiveQuery(
+        () => {
+            const teamId = useAppStore.getState().teamId;
+            return (selectedEvent && teamId) ? db.teamEventData.where({ teamId, eventId: eventRaw?.serverId }).first() : null;
+        },
+        [selectedEvent, eventRaw?.serverId]
+    );
+
+    const event = useMemo(() => {
+        if (!eventRaw) return null;
+        
+        const now = new Date();
+        const endDate = new Date(eventRaw.endDate);
+        const deadline = new Date(eventRaw.registrationDeadline);
+        
+        let status = teamData?.status || eventRaw.status;
+        const manualStatuses = [EventStatus.WON, EventStatus.ATTENDED, EventStatus.REGISTERED, EventStatus.SHORTLISTED, EventStatus.BLOCKED];
+        
+        if (!manualStatuses.includes(status)) {
+            if (!isNaN(endDate.getTime()) && now > endDate) status = EventStatus.COMPLETED;
+            else if (!isNaN(deadline.getTime()) && now > deadline) status = EventStatus.CLOSED;
+        }
+
+        return {
+            ...eventRaw,
+            status,
+            prizeWon: teamData?.prizeWon || 0,
+            isShortlisted: !!teamData?.isShortlisted
+        };
+    }, [eventRaw, teamData]);
 
     const openModal = useAppStore((state) => state.openModal);
     const preferences = useAppStore((state) => state.preferences);
@@ -155,7 +186,15 @@ const EventDetailsModal = () => {
     };
 
     const handleStatusChange = async (newStatus) => {
-        await updateEvent(selectedEvent, { status: newStatus });
+        const { updateTeamEventStatus } = await import('../db');
+        await updateTeamEventStatus(event.serverId, { status: newStatus });
+    };
+
+    const handlePrizeWonChange = async () => {
+        const amount = prompt("Enter prize amount won by your team:", event.prizeWon || 0);
+        if (amount === null) return;
+        const { updateTeamEventStatus } = await import('../db');
+        await updateTeamEventStatus(event.serverId, { prizeWon: amount });
     };
 
     return ReactDOM.createPortal(
@@ -223,12 +262,13 @@ const EventDetailsModal = () => {
                                 if (userRole === 'public') {
                                     openModal('payment');
                                 } else {
-                                    await updateEvent(event.id, { isShortlisted: !event.isShortlisted });
+                                    const { updateTeamEventStatus } = await import('../db');
+                                    await updateTeamEventStatus(event.serverId, { isShortlisted: !event.isShortlisted });
                                 }
                             }}
                             className={cn(
                                 "w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center transition-all border",
-                                event.isShortlisted ? "bg-indigo-600 border-indigo-500 text-white" : "bg-white/10 border-white/10 text-white/60 hover:bg-white/20"
+                                event.isShortlisted ? "bg-rose-500 border-rose-400 text-white" : "bg-white/10 border-white/10 text-white/60 hover:bg-white/20"
                             )}
                         >
                             <Heart size={12} className="sm:size-[14px]" fill={event.isShortlisted ? "currentColor" : "none"} />
@@ -253,17 +293,22 @@ const EventDetailsModal = () => {
                         </div>
 
                         {/* Prize Pool Bar */}
-                        <div className="p-3 bg-gradient-to-br from-amber-400 to-orange-500 rounded-xl text-white shadow-lg shadow-amber-500/10 flex justify-between items-center overflow-hidden relative mb-3">
-                            <Trophy size={44} className="absolute -right-1 -bottom-1 opacity-20" />
+                        <div 
+                            onClick={userRole !== 'public' ? handlePrizeWonChange : undefined}
+                            className={cn(
+                                "p-3 bg-gradient-to-br from-amber-400 to-orange-500 rounded-xl text-white shadow-lg shadow-amber-500/10 flex justify-between items-center overflow-hidden relative mb-3 cursor-pointer group",
+                                userRole === 'public' && "cursor-default brightness-90"
+                            )
+                        }>
+                            <Trophy size={44} className="absolute -right-1 -bottom-1 opacity-20 group-hover:scale-110 transition-transform" />
                             <div className="relative z-10">
-                                <span className="text-[7px] font-black uppercase tracking-[0.2em] opacity-80 block">Prize Pool</span>
+                                <span className="text-[7px] font-black uppercase tracking-[0.2em] opacity-80 block">Prize Pool / Earnings</span>
                                 <h3 className="text-xl sm:text-2xl font-black">₹{(event.prizeAmount || 0).toLocaleString()}</h3>
                             </div>
-                            {event.prizeWon && (
-                                <div className="relative z-10 px-2 py-1 bg-white/20 rounded-lg text-[7px] font-black uppercase max-w-[100px]">
-                                    {event.prizeWon}
-                                </div>
-                            )}
+                            <div className="relative z-10 px-2 py-1 bg-white/20 rounded-lg flex flex-col items-end">
+                                <span className="text-[6px] font-black uppercase opacity-70">Team Winnings</span>
+                                <span className="text-[10px] font-black">{event.prizeWon ? `₹${event.prizeWon}` : '₹0'}</span>
+                            </div>
                         </div>
 
                         {/* Info Grid - 2x2 compact */}
@@ -372,23 +417,26 @@ const EventDetailsModal = () => {
                             </div>
                         )}
 
-                        {/* Status Buttons */}
-                        {canManage && (
-                            <div className="flex flex-wrap gap-1.5 justify-center mb-2">
-                                {Object.values(EventStatus || {}).map(status => (
-                                    <button
-                                        key={status}
-                                        onClick={() => handleStatusChange(status)}
-                                        className={cn(
-                                            "px-3 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-widest transition-all border",
-                                            event.status === status
-                                                ? "bg-indigo-600 text-white border-indigo-600 shadow-md"
-                                                : "bg-white dark:bg-slate-900 text-slate-500 border-slate-100 dark:border-slate-800 hover:border-indigo-300"
-                                        )}
-                                    >
-                                        {status}
-                                    </button>
-                                ))}
+                        {/* Status Grid - Available to all logged-in users */}
+                        {userRole !== 'public' && (
+                            <div className="mb-4">
+                                <h4 className="text-[7px] font-black uppercase tracking-[0.2em] text-slate-400 mb-2 flex items-center gap-1.5"><ShieldCheck size={10}/> Update Your Team Status</h4>
+                                <div className="flex flex-wrap gap-1.5 justify-center">
+                                    {Object.values(EventStatus || {}).map(status => (
+                                        <button
+                                            key={status}
+                                            onClick={() => handleStatusChange(status)}
+                                            className={cn(
+                                                "px-3 py-1.5 rounded-lg text-[8px] font-black uppercase tracking-widest transition-all border",
+                                                event.status === status
+                                                    ? "bg-indigo-600 text-white border-indigo-600 shadow-md"
+                                                    : "bg-white dark:bg-slate-900 text-slate-500 border-slate-100 dark:border-slate-800 hover:border-indigo-300"
+                                            )}
+                                        >
+                                            {status}
+                                        </button>
+                                    ))}
+                                </div>
                             </div>
                         )}
 

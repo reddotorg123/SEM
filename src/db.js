@@ -3,9 +3,6 @@
  * 
  * This file powers the "Offline-First" capability of the app.
  * It uses Dexie.js to manage a local database in the user's browser.
- * 
- * CRITICAL FLOW:
- * Local Action -> Update IndexedDB -> Sync to Firebase
  */
 
 import Dexie from 'dexie';
@@ -19,9 +16,9 @@ export class EventDatabase extends Dexie {
     constructor() {
         super('CollegeEventManager');
 
-        // ++id means auto-incrementing primary key
         this.version(1).stores({
             events: '++id, collegeName, eventName, eventType, registrationDeadline, startDate, endDate, status, priorityScore, createdAt, contact1, contact2, leader, prizeWon, isShortlisted, serverId, teamId, createdBy',
+            teamEventData: '++id, teamId, eventId, status, prizeWon, isShortlisted, updatedAt',
             colleges: '++id, name, location, pastEvents',
             notes: '++id, eventId, content, createdAt',
             settings: 'key, value'
@@ -48,6 +45,7 @@ export const EventType = {
 export const EventStatus = {
     OPEN: 'Open',
     REGISTERED: 'Registered',
+    SHORTLISTED: 'Shortlisted',
     DEADLINE_TODAY: 'Deadline Today',
     CLOSED: 'Closed',
     COMPLETED: 'Completed',
@@ -55,6 +53,8 @@ export const EventStatus = {
     WON: 'Won',
     BLOCKED: 'Blocked'
 };
+
+const MANUAL_STATUSES = [EventStatus.WON, EventStatus.ATTENDED, EventStatus.BLOCKED, EventStatus.REGISTERED, EventStatus.SHORTLISTED];
 
 /**
  * Creates a standard event object with defaults.
@@ -102,7 +102,7 @@ export const createEvent = ({
 
     const event = {
         id,
-        serverId: serverId || crypto.randomUUID(), // Guarantee a unique Server ID
+        serverId: serverId || crypto.randomUUID(),
         collegeName,
         eventName,
         eventType,
@@ -140,9 +140,7 @@ export const createEvent = ({
         updatedAt: updatedAt ? new Date(updatedAt) : now
     };
 
-    // Remove id if it's null so Dexie can auto-increment if needed
     if (event.id === null) delete event.id;
-
     return event;
 };
 
@@ -182,10 +180,9 @@ export const calculatePriorityScore = (event) => {
 
     if (isNaN(deadline.getTime())) return 0;
 
-    // 1. Prize to Fee Ratio (Valuable events score higher)
     const prize = parseFloat(event.prizeAmount) || 0;
     const fee = parseFloat(event.registrationFee) || 0;
-    if (fee === 0 && prize > 0) score += 40; // Free events with prizes are highly valuable
+    if (fee === 0 && prize > 0) score += 40;
     else if (fee > 0) {
         const ratio = prize / fee;
         if (ratio >= 20) score += 40;
@@ -195,7 +192,6 @@ export const calculatePriorityScore = (event) => {
         else if (ratio >= 1) score += 5;
     }
 
-    // 2. Event Type Weights
     const typeScores = {
         [EventType.HACKATHON]: 25,
         [EventType.PROJECT_EXPO]: 20,
@@ -208,14 +204,12 @@ export const calculatePriorityScore = (event) => {
     };
     score += typeScores[event.eventType] || 5;
 
-    // 3. Urgency (closer deadlines get higher priority naturally)
     const daysRemaining = Math.ceil((deadline - now) / (1000 * 60 * 60 * 24));
-    if (daysRemaining < 0) score = 0; // Expired
+    if (daysRemaining < 0) score = 0;
     else if (daysRemaining <= 1) score += 30;
     else if (daysRemaining <= 3) score += 20;
     else if (daysRemaining <= 7) score += 10;
 
-    // 4. Team Bonus (Individual or small team events often easier to enter)
     const tSize = parseInt(event.teamSize) || 1;
     if (tSize === 1) score += 5;
 
@@ -223,18 +217,80 @@ export const calculatePriorityScore = (event) => {
 };
 
 /**
+ * DATA OP: Update a team-specific status/prize/shortlist for an event.
+ */
+export const updateTeamEventStatus = async (eventId, updates) => {
+    const { teamId, cloudProvider } = useAppStore.getState();
+    if (!teamId) return;
+
+    const existing = await db.teamEventData.where({ teamId, eventId }).first();
+    const now = new Date().toISOString();
+    
+    if (existing) {
+        await db.teamEventData.update(existing.id, { ...updates, updatedAt: now });
+    } else {
+        await db.teamEventData.add({ ...updates, teamId, eventId, updatedAt: now });
+    }
+
+    if (cloudProvider === 'firestore') {
+        try {
+            const { saveTeamEventData } = await import('./services/firebase');
+            await saveTeamEventData(teamId, eventId, updates);
+        } catch (e) {
+            console.error('[Sync Fail] Team event data sync failed:', e);
+        }
+    }
+};
+
+/**
+ * UTILITY: Merges global events with the current team's private stats.
+ */
+export const getMergedEvents = async () => {
+    const { teamId } = useAppStore.getState();
+    const globalEvents = await db.events.toArray();
+    
+    if (!teamId) return globalEvents;
+
+    const teamStats = await db.teamEventData.where('teamId').equals(teamId).toArray();
+    const statsMap = new Map(teamStats.map(s => [s.eventId, s]));
+
+    const merged = globalEvents.map(event => {
+        const stats = statsMap.get(event.serverId);
+        const now = new Date();
+        const endDate = new Date(event.endDate);
+        const deadline = new Date(event.registrationDeadline);
+        
+        // Use user-set status OR global calculated status
+        let status = stats?.status || event.status;
+        
+        // Auto-switch logic for "Upcoming" events whose dates have passed
+        if (!MANUAL_STATUSES.includes(status)) {
+            if (!isNaN(endDate.getTime()) && now > endDate) status = EventStatus.COMPLETED;
+            else if (!isNaN(deadline.getTime()) && now > deadline) status = EventStatus.CLOSED;
+        }
+
+        return {
+            ...event,
+            status: status,
+            prizeWon: stats?.prizeWon || 0,
+            isShortlisted: !!stats?.isShortlisted,
+            teamDataUpdatedAt: stats?.updatedAt || null
+        };
+    });
+
+    return merged;
+};
+
+/**
  * DATA OP: Create a new event.
- * Saves locally first, then attempts to sync with Firebase.
  */
 export const addEvent = async (eventData) => {
     const event = createEvent(eventData);
     event.priorityScore = calculatePriorityScore(event);
 
-    // Save to Local DB
     const id = await db.events.add(event);
     const result = { ...event, id };
 
-    // Sync to Cloud
     const state = useAppStore.getState();
     if (state.cloudProvider === 'firestore') {
         try {
@@ -243,37 +299,22 @@ export const addEvent = async (eventData) => {
             console.error('[Sync Fail] Local saved but cloud sync failed:', e);
         }
     }
-
     return result;
 };
 
-/**
- * DATA OP: Update an existing event.
- */
-const MANUAL_STATUSES = [EventStatus.WON, EventStatus.ATTENDED, EventStatus.BLOCKED, EventStatus.REGISTERED];
-
 export const updateEvent = async (id, updates) => {
     const updated = { ...updates, updatedAt: new Date() };
-
-    // If dates or financial info changed, recalculate status and score
     if (updates.registrationDeadline || updates.startDate || updates.endDate ||
         updates.prizeAmount || updates.registrationFee) {
         const event = await db.events.get(id);
         const merged = { ...event, ...updates };
-
-        // Only auto-update status if it's NOT a manual status (Won, Attended, Blocked)
-        // OR if the user is explicitly updating the status in this very call (updates.status would be present)
         if (!updates.status && !MANUAL_STATUSES.includes(event.status)) {
             updated.status = calculateStatus(merged.registrationDeadline, merged.startDate, merged.endDate);
         }
-
         updated.priorityScore = calculatePriorityScore(merged);
     }
-
     await db.events.update(id, updated);
     const finalEvent = await db.events.get(id);
-
-    // Sync to Cloud
     const state = useAppStore.getState();
     if (state.cloudProvider === 'firestore') {
         try {
@@ -282,21 +323,13 @@ export const updateEvent = async (id, updates) => {
             console.error('[Sync Fail] Update failed to sync:', e);
         }
     }
-
     return finalEvent;
 };
 
-/**
- * DATA OP: Remove an event.
- */
 export const deleteEvent = async (id) => {
-    // Get the event first so we have the serverId for cloud deletion
     const event = await db.events.get(id);
-    if (!event) return; // Already deleted?
-
+    if (!event) return;
     await db.events.delete(id);
-
-    // Sync to Cloud
     const state = useAppStore.getState();
     if (state.cloudProvider === 'firestore' && event.serverId) {
         try {
@@ -308,8 +341,7 @@ export const deleteEvent = async (id) => {
 };
 
 /**
- * BULK OP: Used for initial sync from Firebase to Local DB.
- * SET overwrite to true if you want local to EXACTLY match cloud (Deletes local items not in cloud)
+ * BULK OP: Used for initial sync from Firebase to Local DB (Global Events).
  */
 export const bulkImportEvents = async (eventsArray, overwrite = false) => {
     if (!eventsArray) return { added: 0, updated: 0 };
@@ -318,72 +350,57 @@ export const bulkImportEvents = async (eventsArray, overwrite = false) => {
         let added = 0;
         let updated = 0;
         const existingEvents = await db.events.toArray();
-
-        // Map existing events by Server ID for precise matching
         const serverIdMap = new Map();
-        existingEvents.forEach(e => {
-            if (e.serverId) serverIdMap.set(e.serverId, e.id);
-        });
-
-        // Also define legacy map (Name + College) for backward compatibility
+        existingEvents.forEach(e => { if (e.serverId) serverIdMap.set(e.serverId, e.id); });
         const nameMap = new Map(existingEvents.map(e => [`${e.eventName}__${e.collegeName}`.toLowerCase(), e.id]));
-        const currentServerIds = new Set(); // Track IDs in this update batch
+        const currentServerIds = new Set();
 
         for (const data of eventsArray) {
-            // Validate data integrity
             if (!data.eventName || data.eventName.length < 2) continue;
-
             const processed = createEvent(data);
-            // If incoming data has a serverId (which it should from Firestore), use it.
-            // If createEvent generated a NEW one, we might risk duplication if we don't match correctly.
-            // However, subscribeToEvents sets serverId = doc.id, so data.serverId IS set.
-
             const remoteSid = processed.serverId;
             currentServerIds.add(remoteSid);
-
             let localIdToUpdate = serverIdMap.get(remoteSid);
-
-            // Fallback: If no ServerID match, try Name Match (Legacy)
             if (!localIdToUpdate) {
                 const legacyKey = `${processed.eventName}__${processed.collegeName}`.toLowerCase();
-                if (nameMap.has(legacyKey)) {
-                    localIdToUpdate = nameMap.get(legacyKey);
-                }
+                if (nameMap.has(legacyKey)) localIdToUpdate = nameMap.get(legacyKey);
             }
-
             if (localIdToUpdate) {
-                // UPDATE existing local event
                 const localEvent = existingEvents.find(e => e.id === localIdToUpdate);
-
-                // Preserve local data that isn't in cloud
-                if (localEvent?.posterBlob && !processed.posterBlob) {
-                    processed.posterBlob = localEvent.posterBlob;
-                }
-
-                // IMPORTANT: Keep the Local ID intact!
-                // Also ensure we attach the ServerID if the local copy didn't have one
+                if (localEvent?.posterBlob && !processed.posterBlob) processed.posterBlob = localEvent.posterBlob;
                 await db.events.update(localIdToUpdate, { ...processed, id: localIdToUpdate, serverId: remoteSid });
                 updated++;
             } else {
-                // ADD new event locally
-                // Ensure 'id' is undefined so Dexie auto-increments
                 delete processed.id;
                 await db.events.add(processed);
                 added++;
             }
         }
-
-        // Handle deletions if overwrite is enabled
         if (overwrite) {
-            // Delete any local event that has a ServerID BUT is not in the remote batch
             for (const e of existingEvents) {
-                if (e.serverId && !currentServerIds.has(e.serverId)) {
-                    await db.events.delete(e.id);
-                }
+                if (e.serverId && !currentServerIds.has(e.serverId)) await db.events.delete(e.id);
             }
         }
-
         return { added, updated };
+    });
+};
+
+/**
+ * BULK OP: Import Team Stats from Firestore to Local DB.
+ */
+export const bulkImportTeamEventData = async (statsMap, teamId) => {
+    if (!statsMap || !teamId) return;
+
+    await db.transaction('rw', db.teamEventData, async () => {
+        for (const eventId in statsMap) {
+            const data = statsMap[eventId];
+            const existing = await db.teamEventData.where({ teamId, eventId }).first();
+            if (existing) {
+                await db.teamEventData.update(existing.id, { ...data, teamId, eventId });
+            } else {
+                await db.teamEventData.add({ ...data, teamId, eventId });
+            }
+        }
     });
 };
 
@@ -392,54 +409,23 @@ export const bulkImportEvents = async (eventsArray, overwrite = false) => {
  */
 export const updateAllEventStatuses = async () => {
     const events = await db.events.toArray();
-    const state = useAppStore.getState();
-    const isCloud = state.cloudProvider === 'firestore';
-
     for (const event of events) {
-        // Skip manual statuses
         if (MANUAL_STATUSES.includes(event.status)) continue;
-
         const newStatus = calculateStatus(event.registrationDeadline, event.startDate, event.endDate);
         const newScore = calculatePriorityScore(event);
-
         if (newStatus !== event.status || newScore !== event.priorityScore) {
-            const updates = { 
-                status: newStatus, 
-                priorityScore: newScore,
-                updatedAt: new Date() 
-            };
-            
-            await db.events.update(event.id, updates);
-            
-            // Sync to Cloud if applicable
-            if (isCloud) {
-                try {
-                    const updatedEvent = { ...event, ...updates };
-                    await saveEventToFirestore(updatedEvent);
-                } catch (e) {
-                    console.error('[System Sync] Background status update failed to sync:', e);
-                }
-            }
+            await db.events.update(event.id, { status: newStatus, priorityScore: newScore, updatedAt: new Date() });
         }
     }
 };
 
-/**
- * UTILITY: Export all events from the local database.
- */
 export const getAllEvents = async () => {
-    return await db.events.toArray();
+    return await getMergedEvents();
 };
 
-export const exportEventsToCSV = async () => {
-    return await db.events.toArray();
-};
-
-/**
- * UTILITY: Clear everything in the local database.
- */
 export const purgeDatabase = async () => {
     await db.events.clear();
+    await db.teamEventData.clear();
     await db.colleges.clear();
     await db.notes.clear();
 };

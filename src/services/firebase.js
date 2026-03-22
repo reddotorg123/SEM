@@ -175,6 +175,14 @@ export const updateUserRole = async (uid, role) => {
 };
 
 /**
+ * FIRESTORE: Update a user's position/designation within a team
+ */
+export const updateMemberPosition = async (uid, position) => {
+    if (!db) throw new Error("Firestore not initialized");
+    await setDoc(doc(db, "users", uid), { position }, { merge: true });
+};
+
+/**
  * FIRESTORE: Create a manual payment request for admin verification.
  */
 export const createPaymentRequest = async (requestData) => {
@@ -205,42 +213,63 @@ export const createPaymentRequest = async (requestData) => {
 };
 
 /**
- * FIRESTORE: Sets up a real-time listener for event changes.
- * Whenever anyone updates an event, this function calls the callback with the new data.
- * @param {string} teamId - Filter events by teamId for multi-user isolation.
- * @param {string} userRole - If admin, can see all events.
+ * FIRESTORE: Sets up a real-time listener for ALL global events.
+ * This is the shared catalog of events created by Admins.
  */
-export const subscribeToEvents = (callback, onError, teamId = null, userRole = null) => {
+export const subscribeToGlobalEvents = (callback, onError) => {
     if (!db) return null;
     const eventsRef = collection(db, "events");
-
-    // We fetch ALL events ordered by creation date. 
-    // This ensures compatibility with legacy data and simplified "Public Edition" access.
     const q = query(eventsRef, orderBy("createdAt", "desc"));
 
     return onSnapshot(q, (snapshot) => {
-        const events = snapshot.docs.map(doc => {
-            const data = doc.data();
-            return {
-                ...data,
-                serverId: doc.id,
-                id: undefined // Let local DB handle local ID
-            };
-        }).filter(event => {
-            // PUBLIC EDITION LOGIC:
-            // 1. If it's a public/legacy event (no teamId), everyone can see it.
-            // 2. If it has a teamId, only members of THAT team or admins can see it.
-            if (userRole === 'admin') return true;
-            if (!event.teamId) return true; // Legacy/Public events are visible to all
-            if (teamId && event.teamId === teamId) return true; // Team events visible to team members
-            return false; // Otherwise, it's a private team event
-        });
-        console.log(`[Firebase] Real-time snapshot: ${events.length} events processed (including legacy/public).`);
+        const events = snapshot.docs.map(doc => ({
+            ...doc.data(),
+            serverId: doc.id
+        }));
+        console.log(`[Firebase] Global Events Updated: ${events.length}`);
         callback(events);
     }, (error) => {
-        console.error('[Firebase] Real-time listener error:', error.code, error.message);
+        console.error('[Firebase] Global Events Listener failed:', error);
         if (onError) onError(error);
     });
+};
+
+/**
+ * FIRESTORE: Sets up a real-time listener for current team's private event stats (Status/Prize).
+ */
+export const subscribeToTeamEventData = (teamId, callback, onError) => {
+    if (!db || !teamId) return null;
+    const teamEventRef = collection(db, "teamEventData");
+    const q = query(teamEventRef, where("teamId", "==", teamId));
+
+    return onSnapshot(q, (snapshot) => {
+        const stats = snapshot.docs.reduce((acc, doc) => {
+            const data = doc.data();
+            acc[data.eventId] = data;
+            return acc;
+        }, {});
+        console.log(`[Firebase] Team Stats Updated: ${Object.keys(stats).length} entries.`);
+        callback(stats);
+    }, (error) => {
+        console.error('[Firebase] Team Stats Listener failed:', error);
+        if (onError) onError(error);
+    });
+};
+
+/**
+ * FIRESTORE: Saves a team-specific status/prize update for an event.
+ */
+export const saveTeamEventData = async (teamId, eventId, data) => {
+    if (!db) throw new Error("Firestore not initialized");
+    const docId = `${teamId}_${eventId}`;
+    const docRef = doc(db, "teamEventData", docId);
+    
+    await setDoc(docRef, {
+        ...data,
+        teamId,
+        eventId,
+        updatedAt: new Date().toISOString()
+    }, { merge: true });
 };
 
 /**
