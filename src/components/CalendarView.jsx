@@ -97,79 +97,83 @@ const CalendarView = () => {
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
                 {/* Calendar Grid */}
                 <div className="lg:col-span-3 glass-card overflow-hidden">
-                    <div className="grid grid-cols-7 border-b border-slate-100 dark:border-slate-800">
-                        {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-                            <div key={day} className="py-4 text-center text-[10px] font-black uppercase tracking-widest text-slate-400">
-                                {day}
+                    <div className="overflow-x-auto pb-4 sm:pb-0">
+                        <div className="min-w-[500px] sm:min-w-0">
+                            <div className="grid grid-cols-7 border-b border-slate-100 dark:border-slate-800">
+                                {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+                                    <div key={day} className="py-4 text-center text-[10px] font-black uppercase tracking-widest text-slate-400">
+                                        {day}
+                                    </div>
+                                ))}
                             </div>
-                        ))}
-                    </div>
 
-                    <div className="relative overflow-hidden min-h-[500px]">
-                        <AnimatePresence initial={false} custom={direction} mode="wait">
-                            <motion.div
-                                key={currentDate.toString()}
-                                custom={direction}
-                                variants={variants}
-                                initial="enter"
-                                animate="center"
-                                exit="exit"
-                                transition={{ duration: 0.3, ease: 'easeInOut' }}
-                                className="grid grid-cols-7"
-                            >
-                                {calendarDays.map((day, idx) => {
-                                    const dayEvents = getEventsForDay(day);
-                                    const isCurrentMonth = day.getMonth() === currentDate.getMonth();
-                                    const today = isToday(day);
-                                    const isSelected = isSameDay(day, selectedDate);
+                            <div className="relative overflow-hidden min-h-[500px]">
+                                <AnimatePresence initial={false} custom={direction} mode="wait">
+                                    <motion.div
+                                        key={currentDate.toString()}
+                                        custom={direction}
+                                        variants={variants}
+                                        initial="enter"
+                                        animate="center"
+                                        exit="exit"
+                                        transition={{ duration: 0.3, ease: 'easeInOut' }}
+                                        className="grid grid-cols-7"
+                                    >
+                                        {calendarDays.map((day, idx) => {
+                                            const dayEvents = getEventsForDay(day);
+                                            const isCurrentMonth = day.getMonth() === currentDate.getMonth();
+                                            const today = isToday(day);
+                                            const isSelected = isSameDay(day, selectedDate);
 
-                                    return (
-                                        <div
-                                            key={day.toString()}
-                                            onClick={() => setSelectedDate(day)}
-                                            className={cn(
-                                                "min-h-[100px] p-2 border-r border-b border-slate-100 dark:border-slate-800 transition-all cursor-pointer group",
-                                                !isCurrentMonth && "bg-slate-50/50 dark:bg-slate-950/20",
-                                                today && "bg-indigo-50/30 dark:bg-indigo-900/10",
-                                                isSelected && "ring-2 ring-inset ring-indigo-500 bg-indigo-50/50 dark:bg-indigo-500/10"
-                                            )}
-                                        >
-                                            <div className="flex justify-between items-start mb-1">
-                                                <span className={cn(
-                                                    "flex items-center justify-center w-7 h-7 text-xs font-bold rounded-lg transition-all",
-                                                    today ? "bg-indigo-600 text-white shadow-lg shadow-indigo-500/30" :
-                                                        isSelected ? "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300" :
-                                                            isCurrentMonth ? "text-slate-700 dark:text-slate-300 group-hover:bg-slate-100 dark:group-hover:bg-slate-800" :
-                                                                "text-slate-300 dark:text-slate-700"
-                                                )}>
-                                                    {format(day, 'd')}
-                                                </span>
-                                            </div>
-
-                                            <div className="space-y-1">
-                                                {dayEvents.slice(0, 2).map(event => {
-                                                    const isDeadline = isSameDay(day, new Date(event.registrationDeadline));
-                                                    return (
-                                                        <div key={event.id} className={cn(
-                                                            "text-[9px] px-1.5 py-1 rounded-md font-bold truncate transition-all",
-                                                            isDeadline ? "bg-rose-100/80 text-rose-700 dark:bg-rose-500/20 dark:text-rose-400" :
-                                                                "bg-indigo-100/80 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-400"
+                                            return (
+                                                <div
+                                                    key={day.toString()}
+                                                    onClick={() => setSelectedDate(day)}
+                                                    className={cn(
+                                                        "min-h-[100px] p-2 border-r border-b border-slate-100 dark:border-slate-800 transition-all cursor-pointer group",
+                                                        !isCurrentMonth && "bg-slate-50/50 dark:bg-slate-950/20",
+                                                        today && "bg-indigo-50/30 dark:bg-indigo-900/10",
+                                                        isSelected && "ring-2 ring-inset ring-indigo-500 bg-indigo-50/50 dark:bg-indigo-500/10"
+                                                    )}
+                                                >
+                                                    <div className="flex justify-between items-start mb-1">
+                                                        <span className={cn(
+                                                            "flex items-center justify-center w-7 h-7 text-xs font-bold rounded-lg transition-all",
+                                                            today ? "bg-indigo-600 text-white shadow-lg shadow-indigo-500/30" :
+                                                                isSelected ? "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300" :
+                                                                    isCurrentMonth ? "text-slate-700 dark:text-slate-300 group-hover:bg-slate-100 dark:group-hover:bg-slate-800" :
+                                                                        "text-slate-300 dark:text-slate-700"
                                                         )}>
-                                                            {isDeadline && "⚠️ "}{event.eventName}
-                                                        </div>
-                                                    );
-                                                })}
-                                                {dayEvents.length > 2 && (
-                                                    <div className="text-[9px] text-slate-400 font-black pl-1">
-                                                        +{dayEvents.length - 2} MORE
+                                                            {format(day, 'd')}
+                                                        </span>
                                                     </div>
-                                                )}
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-                            </motion.div>
-                        </AnimatePresence>
+
+                                                    <div className="space-y-1">
+                                                        {dayEvents.slice(0, 2).map(event => {
+                                                            const isDeadline = isSameDay(day, new Date(event.registrationDeadline));
+                                                            return (
+                                                                <div key={event.id} className={cn(
+                                                                    "text-[9px] px-1.5 py-1 rounded-md font-bold truncate transition-all",
+                                                                    isDeadline ? "bg-rose-100/80 text-rose-700 dark:bg-rose-500/20 dark:text-rose-400" :
+                                                                        "bg-indigo-100/80 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-400"
+                                                                )}>
+                                                                    {isDeadline && "⚠️ "}{event.eventName}
+                                                                </div>
+                                                            );
+                                                        })}
+                                                        {dayEvents.length > 2 && (
+                                                            <div className="text-[9px] text-slate-400 font-black pl-1">
+                                                                +{dayEvents.length - 2} MORE
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </motion.div>
+                                </AnimatePresence>
+                            </div>
+                        </div>
                     </div>
                 </div>
 

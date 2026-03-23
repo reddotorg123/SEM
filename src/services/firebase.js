@@ -176,6 +176,14 @@ export const updateUserProfile = async (uid, data) => {
 };
 
 /**
+ * FIRESTORE: Delete user data
+ */
+export const deleteUserData = async (uid) => {
+    if (!db) throw new Error("Firestore not initialized");
+    await deleteDoc(doc(db, "users", uid));
+};
+
+/**
  * FIRESTORE: Set user role (Admin only)
  */
 export const getAllUsers = async () => {

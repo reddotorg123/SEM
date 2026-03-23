@@ -65,7 +65,7 @@ const Header = () => {
                                     SEM
                                 </span>
                                 <span className="text-[10px] font-black text-indigo-400 uppercase tracking-widest leading-none mt-1">
-                                    {userRole === 'public' ? 'PUBLIC' : 'TEAM'} EDITION
+                                    {userRole === 'public' ? 'PUBLIC' : 'TEAM'} <span className="hidden sm:inline">EDITION</span>
                                 </span>
                             </div>
                         </Link>
@@ -92,10 +92,10 @@ const Header = () => {
                         {canAdd && (
                             <button
                                 onClick={() => openModal('addEvent')}
-                                className="h-10 px-6 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-bold flex items-center gap-2 shadow-lg shadow-indigo-600/20 transition-all hover:scale-105 active:scale-95"
+                                className="h-10 px-4 sm:px-6 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-bold flex items-center gap-2 shadow-lg shadow-indigo-600/20 transition-all hover:scale-105 active:scale-95"
                             >
                                 <Plus size={18} />
-                                <span>Add Event</span>
+                                <span className="hidden sm:inline">Add Event</span>
                             </button>
                         )}
 

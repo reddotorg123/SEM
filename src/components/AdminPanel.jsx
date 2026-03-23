@@ -36,7 +36,8 @@ import {
     subscribeToPaymentRequests, 
     approvePaymentRequest, 
     rejectPaymentRequest,
-    deleteEventFromFirestore
+    deleteEventFromFirestore,
+    deleteUserData
 } from '../services/firebase';
 import { format } from 'date-fns';
 import { cn } from '../utils';
@@ -110,8 +111,9 @@ const AdminPanel = () => {
     const handlePaymentAction = async (request, action) => {
         try {
             if (action === 'approve') {
-                await approvePaymentRequest(request.id, request.userId, request.planRole);
-                setUsers(prev => prev.map(u => u.id === request.userId ? { ...u, role: request.planRole } : u));
+                const roleToAssign = request.planRole || 'team_leader';
+                await approvePaymentRequest(request.id, request.userId, roleToAssign);
+                setUsers(prev => prev.map(u => u.id === request.userId ? { ...u, role: roleToAssign } : u));
             } else {
                 await rejectPaymentRequest(request.id, request.userId);
                 setUsers(prev => prev.map(u => u.id === request.userId ? { ...u, role: 'public' } : u));
@@ -136,6 +138,17 @@ const AdminPanel = () => {
         }
     };
 
+    const handleDeleteUser = async (userObj) => {
+        if (!window.confirm(`Are you sure you want to permanently delete user: ${userObj.displayName || userObj.email}?`)) return;
+        try {
+            await deleteUserData(userObj.id);
+            setUsers(prev => prev.filter(u => u.id !== userObj.id));
+        } catch (err) {
+            console.error("Failed to delete user:", err);
+            alert("Failed to delete. Ensure you have permissions.");
+        }
+    };
+
     const tabs = [
         { id: 'events', label: 'Matrix Control', icon: Calendar, description: 'Manage global events & data streams' },
         { id: 'users', label: 'Unit Directory', icon: Users, description: 'User roles & system permissions' },
@@ -145,41 +158,41 @@ const AdminPanel = () => {
     return (
         <div className="pb-32 pt-4 sm:pt-8">
             {/* Admin Banner */}
-            <div className="relative mb-12 overflow-hidden bg-slate-900 rounded-[2.5rem] p-8 sm:p-12 shadow-2xl border border-white/5 group">
+            <div className="relative mb-8 sm:mb-12 overflow-hidden bg-slate-900 rounded-2xl sm:rounded-[2.5rem] p-5 sm:p-12 shadow-2xl border border-white/5 group">
                 <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-indigo-600/20 blur-[150px] rounded-full translate-x-1/2 -translate-y-1/2" />
                 
-                <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-8">
+                <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6 sm:gap-8">
                     <div>
-                        <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/5 rounded-lg text-[9px] font-black uppercase tracking-[0.3em] text-indigo-400 mb-6 border border-white/10">
-                            <Shield size={12} /> ADMINISTRATIVE INTELLIGENCE PANEL
+                        <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/5 rounded-lg text-[8px] sm:text-[9px] font-black uppercase tracking-[0.2em] sm:tracking-[0.3em] text-indigo-400 mb-4 sm:mb-6 border border-white/10">
+                            <Shield size={12} /> ADMIN PANEL
                         </div>
-                        <h1 className="text-4xl sm:text-6xl font-black text-white tracking-tighter leading-none mb-4">
+                        <h1 className="text-3xl sm:text-6xl font-black text-white tracking-tighter leading-none mb-3 sm:mb-4">
                             Operational <span className="bg-gradient-to-r from-indigo-400 to-violet-400 bg-clip-text text-transparent">Command</span>
                         </h1>
-                        <p className="text-slate-400 font-bold max-w-xl text-sm leading-relaxed">
+                        <p className="text-slate-400 font-bold max-w-xl text-xs sm:text-sm leading-relaxed hidden sm:block">
                             Welcome, Founder. Manage the global event matrix, verify personnel credentials, and monitor system-wide transaction logs from this interface.
                         </p>
                     </div>
 
-                    <div className="flex flex-wrap gap-4">
-                        <div className="px-6 py-4 bg-white/5 backdrop-blur-md rounded-2xl border border-white/10 text-center flex-1 sm:flex-none min-w-[120px]">
-                            <span className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Global Events</span>
-                            <span className="text-2xl font-black text-white">{(localEvents || []).length}</span>
+                    <div className="grid grid-cols-3 sm:flex sm:flex-wrap gap-2 sm:gap-4">
+                        <div className="px-3 sm:px-6 py-3 sm:py-4 bg-white/5 backdrop-blur-md rounded-xl sm:rounded-2xl border border-white/10 text-center flex-1 sm:flex-none sm:min-w-[120px]">
+                            <span className="block text-[8px] sm:text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Events</span>
+                            <span className="text-lg sm:text-2xl font-black text-white">{(localEvents || []).length}</span>
                         </div>
-                        <div className="px-6 py-4 bg-white/5 backdrop-blur-md rounded-2xl border border-white/10 text-center flex-1 sm:flex-none min-w-[120px]">
-                            <span className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Total Units</span>
-                            <span className="text-2xl font-black text-indigo-400">{users.length || '--'}</span>
+                        <div className="px-3 sm:px-6 py-3 sm:py-4 bg-white/5 backdrop-blur-md rounded-xl sm:rounded-2xl border border-white/10 text-center flex-1 sm:flex-none sm:min-w-[120px]">
+                            <span className="block text-[8px] sm:text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Units</span>
+                            <span className="text-lg sm:text-2xl font-black text-indigo-400">{users.length || '--'}</span>
                         </div>
-                        <div className="px-6 py-4 bg-white/5 backdrop-blur-md rounded-2xl border border-white/10 text-center flex-1 sm:flex-none min-w-[120px]">
-                            <span className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Active Teams</span>
-                            <span className="text-2xl font-black text-emerald-400">{new Set(users.map(u => u.teamId).filter(Boolean)).size || 0}</span>
+                        <div className="px-3 sm:px-6 py-3 sm:py-4 bg-white/5 backdrop-blur-md rounded-xl sm:rounded-2xl border border-white/10 text-center flex-1 sm:flex-none sm:min-w-[120px]">
+                            <span className="block text-[8px] sm:text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Teams</span>
+                            <span className="text-lg sm:text-2xl font-black text-emerald-400">{new Set(users.map(u => u.teamId).filter(Boolean)).size || 0}</span>
                         </div>
                     </div>
                 </div>
             </div>
 
             {/* Tab Navigation */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+            <div className="grid grid-cols-3 gap-2 sm:gap-6 mb-8 sm:mb-12">
                 {tabs.map(tab => {
                     const Icon = tab.icon;
                     const isActive = activeTab === tab.id;
@@ -188,7 +201,7 @@ const AdminPanel = () => {
                             key={tab.id}
                             onClick={() => setActiveTab(tab.id)}
                             className={cn(
-                                "relative p-6 rounded-[2rem] border-2 transition-all group overflow-hidden text-left",
+                                "relative p-3 sm:p-6 rounded-xl sm:rounded-[2rem] border-2 transition-all group overflow-hidden text-left",
                                 isActive 
                                     ? "bg-white dark:bg-slate-900 border-indigo-600 shadow-xl" 
                                     : "bg-slate-50 dark:bg-slate-900/50 border-slate-100 dark:border-slate-800 hover:border-slate-300"
@@ -196,24 +209,24 @@ const AdminPanel = () => {
                         >
                             {isActive && <div className="absolute top-0 right-0 w-24 h-24 bg-indigo-600/5 rounded-full translate-x-1/2 -translate-y-1/2" />}
                             <div className={cn(
-                                "w-12 h-12 rounded-2xl flex items-center justify-center mb-6 transition-transform group-hover:scale-110",
+                                "w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl flex items-center justify-center mb-3 sm:mb-6 transition-transform group-hover:scale-110",
                                 isActive ? "bg-indigo-600 text-white shadow-lg" : "bg-white dark:bg-slate-800 text-slate-400"
                             )}>
-                                <Icon size={24} />
+                                <Icon size={20} className="sm:w-6 sm:h-6" />
                             </div>
-                            <h3 className={cn("text-lg font-black uppercase tracking-tighter mb-1", isActive ? "text-slate-900 dark:text-white" : "text-slate-500")}>
+                            <h3 className={cn("text-xs sm:text-lg font-black uppercase tracking-tighter mb-1", isActive ? "text-slate-900 dark:text-white" : "text-slate-500")}>
                                 {tab.label}
                             </h3>
-                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{tab.description}</p>
+                            <p className="text-[8px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden sm:block">{tab.description}</p>
                         </button>
                     );
                 })}
             </div>
 
             {/* Content Area */}
-            <div className="bg-white dark:bg-slate-900 rounded-[3rem] shadow-2xl border border-slate-100 dark:border-slate-800 overflow-hidden min-h-[500px]">
+            <div className="bg-white dark:bg-slate-900 rounded-2xl sm:rounded-[3rem] shadow-2xl border border-slate-100 dark:border-slate-800 overflow-hidden min-h-[400px] sm:min-h-[500px]">
                 {/* Search Bar / Actions */}
-                <div className="p-8 border-b border-slate-50 dark:border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-6">
+                <div className="p-4 sm:p-8 border-b border-slate-50 dark:border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-4 sm:gap-6">
                     <div className="relative flex-1 max-w-md">
                         <Search className="absolute left-6 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                         <input
@@ -344,23 +357,30 @@ const AdminPanel = () => {
                                                         </div>
                                                     </div>
                                                 </div>
-                                                <div className="flex items-center gap-3">
+                                                <div className="flex flex-wrap items-center gap-2 sm:gap-3">
                                                     <button 
                                                         onClick={() => setSelectedUser(u)}
-                                                        className="h-10 px-4 bg-white dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-800 rounded-xl text-[10px] font-black text-slate-500 uppercase flex items-center gap-2 hover:border-indigo-600 hover:text-indigo-600 transition-all"
+                                                        className="h-9 sm:h-10 px-3 sm:px-4 bg-white dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-800 rounded-xl text-[10px] font-black text-slate-500 uppercase flex items-center gap-2 hover:border-indigo-600 hover:text-indigo-600 transition-all"
                                                     >
                                                         <Eye size={14} /> View
                                                     </button>
                                                     <select 
                                                         value={u.role} 
                                                         onChange={(e) => handleRoleUpdate(u.id, e.target.value)}
-                                                        className="bg-white dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-800 rounded-xl px-4 py-2.5 text-[10px] font-black uppercase tracking-widest outline-none focus:border-indigo-600 h-10"
+                                                        className="bg-white dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-800 rounded-xl px-3 sm:px-4 py-2 sm:py-2.5 text-[10px] font-black uppercase tracking-widest outline-none focus:border-indigo-600 h-9 sm:h-10"
                                                     >
                                                         <option value="public">Public</option>
                                                         <option value="team_leader">Team Leader</option>
                                                         <option value="event_manager">Event Manager</option>
                                                         <option value="admin">Administrator</option>
                                                     </select>
+                                                    <button 
+                                                        onClick={() => handleDeleteUser(u)}
+                                                        className="h-9 sm:h-10 px-3 bg-rose-50 text-rose-500 rounded-xl hover:bg-rose-500 hover:text-white transition-all flex items-center justify-center border border-rose-100"
+                                                        title="Delete User"
+                                                    >
+                                                        <Trash2 size={16} />
+                                                    </button>
                                                 </div>
                                             </div>
                                         ))}
@@ -376,8 +396,8 @@ const AdminPanel = () => {
                                             </div>
                                         )}
                                         {payments.map(req => (
-                                            <div key={req.id} className="p-8 rounded-[2.5rem] bg-slate-50/50 dark:bg-slate-800/30 border border-slate-100 dark:border-slate-800">
-                                                <div className="flex flex-col lg:flex-row justify-between gap-8">
+                                            <div key={req.id} className="p-4 sm:p-8 rounded-2xl sm:rounded-[2.5rem] bg-slate-50/50 dark:bg-slate-800/30 border border-slate-100 dark:border-slate-800">
+                                                <div className="flex flex-col lg:flex-row justify-between gap-4 sm:gap-8">
                                                     <div className="space-y-4 flex-1">
                                                         <div className="flex items-center gap-3">
                                                             <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />

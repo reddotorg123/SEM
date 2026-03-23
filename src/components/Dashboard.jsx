@@ -170,7 +170,7 @@ const Dashboard = () => {
             className="pb-28 pt-4 sm:pt-8"
         >
             {/* Command Central Header */}
-            <div className="relative mb-8 sm:mb-12 overflow-hidden bg-[#0a0c16] rounded-3xl sm:rounded-[4rem] p-6 sm:p-12 shadow-[0_40px_100px_-20px_rgba(0,0,0,0.4)] group">
+            <div className="relative mb-8 sm:mb-12 overflow-hidden bg-[#0a0c16] rounded-3xl sm:rounded-[4rem] p-5 sm:p-12 shadow-[0_40px_100px_-20px_rgba(0,0,0,0.4)] group">
                 {/* Background FX */}
                 <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-indigo-600/10 blur-[150px] rounded-full translate-x-1/2 -translate-y-1/2" />
                 <div className="absolute bottom-0 left-0 w-80 h-80 bg-violet-600/10 blur-[100px] rounded-full -translate-x-1/4 translate-y-1/4" />
@@ -188,7 +188,7 @@ const Dashboard = () => {
                             {userRole === 'public' ? 'PUBLIC' : 'TEAM'} EDITION • {userRole?.replace('_', ' ') || 'PERSONAL'} COMMAND
                         </motion.div>
                         <div className="flex flex-col gap-4 mb-4">
-                            <h1 className="text-5xl sm:text-7xl font-black text-white tracking-tight leading-none">
+                            <h1 className="text-3xl sm:text-7xl font-black text-white tracking-tight leading-none">
                                 Hello, <span className="bg-gradient-to-r from-indigo-400 to-indigo-200 bg-clip-text text-transparent">{(user?.displayName || 'JD').split(' ')[0]}</span>
                             </h1>
                         </div>
@@ -199,13 +199,13 @@ const Dashboard = () => {
                         </p>
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-4">
+                    <div className="flex flex-wrap items-center gap-3 sm:gap-4 mt-6 sm:mt-0">
                         {(userRole === 'admin' || userRole === 'event_manager') && (
                             <Link 
                                 to="/admin"
-                                className="px-8 h-16 bg-gradient-to-r from-indigo-600 to-violet-700 text-white rounded-3xl font-black text-xs uppercase tracking-widest shadow-2xl hover:scale-105 transition-all flex items-center gap-3 border border-white/20"
+                                className="px-5 sm:px-8 h-12 sm:h-16 bg-gradient-to-r from-indigo-600 to-violet-700 text-white rounded-[1.25rem] sm:rounded-3xl font-black text-[10px] sm:text-xs uppercase tracking-widest shadow-2xl hover:scale-105 transition-all flex items-center gap-2 sm:gap-3 border border-white/20"
                             >
-                                <Shield size={20} />
+                                <Shield size={18} className="sm:w-5 sm:h-5" />
                                 ADMIN CONSOLE
                             </Link>
                         )}
@@ -213,17 +213,17 @@ const Dashboard = () => {
                             <>
                                 <button
                                     onClick={() => openModal('addEvent')}
-                                    className="px-8 h-16 bg-white text-slate-950 rounded-3xl font-black text-sm uppercase tracking-widest shadow-2xl hover:scale-105 active:scale-95 transition-all flex items-center gap-3 border-2 border-transparent hover:border-black"
+                                    className="px-5 sm:px-8 h-12 sm:h-16 bg-white text-slate-950 rounded-[1.25rem] sm:rounded-3xl font-black text-[10px] sm:text-sm uppercase tracking-widest shadow-2xl hover:scale-105 active:scale-95 transition-all flex items-center gap-2 sm:gap-3 border-2 border-transparent hover:border-black"
                                 >
-                                    <Plus size={20} strokeWidth={4} />
+                                    <Plus size={18} strokeWidth={4} className="sm:w-5 sm:h-5" />
                                     ADD NEW EVENT
                                 </button>
                                 <button
                                     onClick={() => openModal('importCSV')}
-                                    className="w-16 h-16 bg-white/5 backdrop-blur-md text-white rounded-3xl flex items-center justify-center hover:bg-white/10 transition-all border border-white/10 shadow-xl"
+                                    className="w-12 h-12 sm:w-16 sm:h-16 bg-white/5 backdrop-blur-md text-white rounded-[1.25rem] sm:rounded-3xl flex items-center justify-center hover:bg-white/10 transition-all border border-white/10 shadow-xl"
                                     title="Import Data"
                                 >
-                                    <FileUp size={24} />
+                                    <FileUp size={18} className="sm:w-6 sm:h-6" />
                                 </button>
                             </>
                         )}
@@ -253,9 +253,9 @@ const Dashboard = () => {
             </div>
 
             {/* Quick Stats Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8 mb-16 px-1">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-8 mb-10 sm:mb-16 px-1">
                 <div 
-                    className="bg-white dark:bg-slate-900 rounded-[2.5rem] p-8 shadow-[0_20px_50px_-15px_rgba(0,0,0,0.05)] border border-slate-100 dark:border-slate-800 relative overflow-hidden group hover:scale-[1.02] transition-transform duration-500 cursor-pointer"
+                    className="bg-white dark:bg-slate-900 rounded-xl sm:rounded-[2.5rem] p-4 sm:p-8 shadow-[0_20px_50px_-15px_rgba(0,0,0,0.05)] border border-slate-100 dark:border-slate-800 relative overflow-hidden group hover:scale-[1.02] transition-transform duration-500 cursor-pointer"
                     onClick={() => {
                         resetFilters();
                         setFilters({ dateRange: 'upcoming' });
@@ -263,7 +263,7 @@ const Dashboard = () => {
                     }}
                 >
                     <div className="absolute -right-4 -top-4 w-32 h-32 bg-indigo-50 dark:bg-indigo-900/10 rounded-full transition-all group-hover:scale-110" />
-                    <div className="flex items-center justify-between mb-8 relative z-10">
+                    <div className="flex items-center justify-between mb-4 sm:mb-8 relative z-10">
                         <div className="w-14 h-14 bg-indigo-50 dark:bg-indigo-900/30 rounded-2xl flex items-center justify-center">
                             <Calendar className="text-indigo-600 dark:text-indigo-400 w-7 h-7" />
                         </div>
@@ -279,7 +279,7 @@ const Dashboard = () => {
                 </div>
 
                 <div 
-                    className="bg-white dark:bg-slate-900 rounded-[2.5rem] p-8 shadow-[0_20px_50px_-15px_rgba(0,0,0,0.05)] border border-slate-100 dark:border-slate-800 relative overflow-hidden group hover:scale-[1.02] transition-transform duration-500 cursor-pointer"
+                    className="bg-white dark:bg-slate-900 rounded-xl sm:rounded-[2.5rem] p-4 sm:p-8 shadow-[0_20px_50px_-15px_rgba(0,0,0,0.05)] border border-slate-100 dark:border-slate-800 relative overflow-hidden group hover:scale-[1.02] transition-transform duration-500 cursor-pointer"
                     onClick={() => {
                         resetFilters();
                         setFilters({ dateRange: 'today' });
@@ -287,7 +287,7 @@ const Dashboard = () => {
                     }}
                 >
                     <div className="absolute -right-4 -top-4 w-32 h-32 bg-rose-50 dark:bg-rose-900/10 rounded-full transition-all group-hover:scale-110" />
-                    <div className="flex items-center justify-between mb-8 relative z-10">
+                    <div className="flex items-center justify-between mb-4 sm:mb-8 relative z-10">
                         <div className="w-14 h-14 bg-rose-50 dark:bg-rose-900/30 rounded-2xl flex items-center justify-center">
                             <Bell className="text-rose-500 dark:text-rose-400 w-7 h-7" />
                         </div>
@@ -301,7 +301,7 @@ const Dashboard = () => {
                 </div>
 
                 <div 
-                    className="bg-white dark:bg-slate-900 rounded-[2.5rem] p-8 shadow-[0_20px_50px_-15px_rgba(0,0,0,0.05)] border border-slate-100 dark:border-slate-800 relative overflow-hidden group hover:scale-[1.02] transition-transform duration-500 cursor-pointer"
+                    className="bg-white dark:bg-slate-900 rounded-xl sm:rounded-[2.5rem] p-4 sm:p-8 shadow-[0_20px_50px_-15px_rgba(0,0,0,0.05)] border border-slate-100 dark:border-slate-800 relative overflow-hidden group hover:scale-[1.02] transition-transform duration-500 cursor-pointer"
                     onClick={() => {
                         resetFilters();
                         setFilters({ dateRange: 'week' });
@@ -309,7 +309,7 @@ const Dashboard = () => {
                     }}
                 >
                     <div className="absolute -right-4 -top-4 w-32 h-32 bg-emerald-50 dark:bg-emerald-900/10 rounded-full transition-all group-hover:scale-110" />
-                    <div className="flex items-center justify-between mb-8 relative z-10">
+                    <div className="flex items-center justify-between mb-4 sm:mb-8 relative z-10">
                         <div className="w-14 h-14 bg-emerald-50 dark:bg-emerald-900/30 rounded-2xl flex items-center justify-center">
                             <Target className="text-emerald-500 dark:text-emerald-400 w-7 h-7" />
                         </div>
@@ -325,9 +325,9 @@ const Dashboard = () => {
                     </div>
                 </div>
 
-                <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] p-8 shadow-[0_20px_50px_-15px_rgba(0,0,0,0.05)] border border-slate-100 dark:border-slate-800 relative overflow-hidden group hover:scale-[1.02] transition-transform duration-500 cursor-pointer" onClick={() => navigate('/analytics')}>
+                <div className="bg-white dark:bg-slate-900 rounded-xl sm:rounded-[2.5rem] p-4 sm:p-8 shadow-[0_20px_50px_-15px_rgba(0,0,0,0.05)] border border-slate-100 dark:border-slate-800 relative overflow-hidden group hover:scale-[1.02] transition-transform duration-500 cursor-pointer" onClick={() => navigate('/analytics')}>
                     <div className="absolute -right-4 -top-4 w-32 h-32 bg-amber-50 dark:bg-amber-900/10 rounded-full transition-all group-hover:scale-110" />
-                    <div className="flex items-center justify-between mb-8 relative z-10">
+                    <div className="flex items-center justify-between mb-4 sm:mb-8 relative z-10">
                         <div className="w-14 h-14 bg-amber-50 dark:bg-amber-900/30 rounded-2xl flex items-center justify-center">
                             <Trophy className="text-amber-500 dark:text-amber-400 w-7 h-7" />
                         </div>
