@@ -484,7 +484,7 @@ const Dashboard = () => {
                                             ) : (
                                                 <div className="flex items-center justify-between">
                                                     <p className="text-[10px] font-bold text-indigo-500 uppercase tracking-widest mt-0.5">{member.position || 'Explorer'}</p>
-                                                    {(user.uid === teamId && member.id !== teamId) && (
+                                                    {user.uid === teamId && (
                                                         <button 
                                                             onClick={() => { setEditingMember(member.id); setNewPosition(member.position || 'Explorer'); }}
                                                             className="opacity-0 group-hover/member:opacity-100 p-1 text-slate-400 hover:text-indigo-600 transition-all"
