@@ -532,7 +532,8 @@ export const sendTeamMessage = async (teamId, senderId, senderName, content) => 
         senderId,
         senderName,
         content,
-        timestamp: new Date().toISOString()
+        // Use serverTimestamp for Firestore consistency, fall back to local for speed
+        timestamp: serverTimestamp()
     });
 };
 

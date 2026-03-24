@@ -171,9 +171,13 @@ const EventCard = React.memo(({ event, compact = false }) => {
 
                 {/* Header Row: Type + Actions */}
                 <div className="flex items-start justify-between mb-2">
-                    <span className="px-2 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 text-[9px] font-black uppercase tracking-wider rounded-md">
-                        {event.eventType}
-                    </span>
+                    <div className="flex flex-wrap gap-1">
+                        {(event.eventType || 'Event').split(',').map((type, idx) => (
+                            <span key={idx} className="px-2 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 text-[9px] font-black uppercase tracking-wider rounded-md">
+                                {type.trim()}
+                            </span>
+                        ))}
+                    </div>
 
                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity no-click">
                         <button onClick={(e) => { e.stopPropagation(); togglePinnedEvent(event.id); }} className={cn("p-1.5 rounded-lg transition-colors", isPinned ? "text-indigo-600 bg-indigo-50" : "text-slate-400 hover:bg-slate-100")}>

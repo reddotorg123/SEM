@@ -353,6 +353,15 @@ const Dashboard = () => {
                                 </button>
                             </>
                         )}
+                        {(user?.uid === teamId && userRole !== 'admin') && (
+                            <button
+                                onClick={handleJoinTeam}
+                                className="px-5 sm:px-8 h-12 sm:h-16 bg-indigo-600 text-white rounded-[1.25rem] sm:rounded-3xl font-black text-[10px] sm:text-sm uppercase tracking-widest shadow-2xl hover:scale-105 active:scale-95 transition-all flex items-center gap-2 sm:gap-3 border border-white/20"
+                            >
+                                <Users size={18} className="sm:w-5 sm:h-5" />
+                                JOIN UNIT
+                            </button>
+                        )}
                     </div>
                 </div>
 
