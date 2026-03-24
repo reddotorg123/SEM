@@ -149,14 +149,6 @@ export const subscribeToUserData = (uid, callback) => {
                 hasSubscription: !!data.hasSubscription,
                 position: data.position || 'Explorer'
             });
-        } else {
-            // New user or missing profile - default to lone wolf public
-            callback({ 
-                role: "public", 
-                teamId: uid, 
-                hasSubscription: false, 
-                position: 'Explorer' 
-            });
         }
     });
 };

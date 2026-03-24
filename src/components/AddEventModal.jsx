@@ -47,7 +47,7 @@ const AddEventModal = () => {
     const [formData, setFormData] = useState({
         collegeName: '',
         eventName: '',
-        eventTypes: [EventType.HACKATHON], // Changed to array
+        eventType: EventType.HACKATHON,
         customEventType: '',
         registrationDeadline: '',
         startDate: '',
@@ -114,7 +114,7 @@ const AddEventModal = () => {
                 eventName: lines[0] || prev.eventName,
                 prizeAmount: extractedText.match(/(?:(?:INR|₹|Prize|Worth)\.?\s*)([0-9,]+)/i)?.[1].replace(/,/g, '') || prev.prizeAmount,
                 description: `AI ANALYZED: ${extractedText.substring(0, 100)}...`,
-                eventTypes: textLower.includes('hack') ? [EventType.HACKATHON] : [EventType.CONTEST]
+                eventType: textLower.includes('hack') ? EventType.HACKATHON : EventType.CONTEST
             }));
 
             alert('SYSTEM: Neural Protocol Complete. Data successfully injected into form matrix.');
@@ -141,16 +141,11 @@ const AddEventModal = () => {
         try {
             const { teamId, user, userRole } = useAppStore.getState();
             const isAdmin = userRole === 'admin' || userRole === 'event_manager';
-            
-            // Filter out 'Other' and add custom type if it exists
-            const finalTypes = formData.eventTypes.includes(EventType.OTHER) 
-                ? [...formData.eventTypes.filter(t => t !== EventType.OTHER), formData.customEventType].filter(Boolean)
-                : formData.eventTypes;
+            const actualEventType = (formData.eventType === EventType.OTHER && formData.customEventType.trim()) ? formData.customEventType : formData.eventType;
             
             const eventData = {
                 ...formData,
-                eventType: finalTypes.join(', '), // Store as string for compatibility or keep as array if possible
-                eventTypes: finalTypes, // Store as array for better filtering
+                eventType: actualEventType,
                 prizeAmount: parseFloat(formData.prizeAmount) || 0,
                 prizeWon: parseFloat(formData.prizeWon) || 0,
                 registrationFee: parseFloat(formData.registrationFee) || 0,
@@ -161,7 +156,7 @@ const AddEventModal = () => {
             };
             await addEvent(eventData);
             closeModal('addEvent');
-            setFormData({ collegeName: '', eventName: '', eventTypes: [EventType.HACKATHON], customEventType: '', registrationDeadline: '', startDate: '', endDate: '', prizeAmount: '', prizeWon: '', registrationFee: '', accommodation: false, location: '', isOnline: false, contactNumbers: '', posterUrl: '', posterBlob: null, website: '', registrationLink: '', description: '', teamSize: '1', teamName: '', eligibility: '', leader: '', members: '', contact1: '', contact2: '' });
+            setFormData({ collegeName: '', eventName: '', eventType: EventType.HACKATHON, customEventType: '', registrationDeadline: '', startDate: '', endDate: '', prizeAmount: '', prizeWon: '', registrationFee: '', accommodation: false, location: '', isOnline: false, contactNumbers: '', posterUrl: '', posterBlob: null, website: '', registrationLink: '', description: '', teamSize: '1', teamName: '', eligibility: '', leader: '', members: '', contact1: '', contact2: '' });
         } catch (error) {
             alert(`CRITICAL ERROR: ${error.message}`);
         } finally {
@@ -238,51 +233,24 @@ const AddEventModal = () => {
                                         <label className="label-premium">College Name</label>
                                         <input type="text" name="collegeName" value={formData.collegeName} onChange={handleChange} required={activeTab === 'basic'} className="input-premium" placeholder="Host College Name" />
                                     </div>
-                                    <div className="form-group col-span-2">
-                                        <label className="label-premium">Operational Categories (Multiple Selection)</label>
-                                        <div className="flex flex-wrap gap-2 mb-3 min-h-[40px] p-4 bg-slate-50 dark:bg-slate-800/40 rounded-2xl border border-slate-100 dark:border-slate-800">
-                                            {formData.eventTypes.length > 0 ? formData.eventTypes.map((type, i) => (
-                                                <span key={i} className="px-3 py-1.5 bg-indigo-600 text-white rounded-xl text-[10px] font-black uppercase flex items-center gap-2 shadow-lg shadow-indigo-600/20">
-                                                    {type}
-                                                    <X size={12} className="cursor-pointer hover:text-rose-300" onClick={() => {
-                                                        setFormData(prev => ({
-                                                            ...prev,
-                                                            eventTypes: prev.eventTypes.filter((_, idx) => idx !== i)
-                                                        }));
-                                                    }} />
-                                                </span>
-                                            )) : (
-                                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest italic pt-1">Select deployment types...</span>
-                                            )}
-                                        </div>
-                                        <div className="grid grid-cols-2 gap-3">
-                                            <select 
-                                                className="input-premium"
-                                                onChange={(e) => {
-                                                    const val = e.target.value;
-                                                    if (!formData.eventTypes.includes(val)) {
-                                                        setFormData(prev => ({
-                                                            ...prev,
-                                                            eventTypes: [...prev.eventTypes, val]
-                                                        }));
-                                                    }
-                                                }}
-                                            >
-                                                <option value="" disabled selected>Add Category...</option>
+                                    <div className="grid grid-cols-2 gap-3 sm:gap-4">
+                                        <div className="form-group">
+                                            <label className="label-premium">Event Type</label>
+                                            <select name="eventType" value={formData.eventType} onChange={handleChange} required={activeTab === 'basic'} className="input-premium">
                                                 {Object.values(EventType).map(t => <option key={t} value={t}>{t}</option>)}
                                             </select>
-                                            {formData.eventTypes.includes(EventType.OTHER) && (
+                                            {formData.eventType === EventType.OTHER && (
                                                 <input 
                                                     type="text" 
                                                     name="customEventType" 
                                                     value={formData.customEventType} 
                                                     onChange={handleChange} 
-                                                    className="input-premium" 
-                                                    placeholder="Specify Identity..." 
+                                                    required={activeTab === 'basic'} 
+                                                    className="input-premium mt-2" 
+                                                    placeholder="Specify Event Type (e.g. Workshop)" 
                                                 />
                                             )}
                                         </div>
-                                    </div>
                                         <div className="form-group">
                                             <label className="label-premium">Team Size</label>
                                             <input type="number" name="teamSize" value={formData.teamSize} onChange={handleChange} className="input-premium" min="1" />
@@ -294,6 +262,7 @@ const AddEventModal = () => {
                                             </div>
                                         )}
                                     </div>
+                                </div>
                                 <div className="bg-slate-50 dark:bg-slate-800/40 p-6 sm:p-10 rounded-2xl sm:rounded-[2.5rem] border-2 border-dashed border-slate-200 dark:border-slate-800 relative group">
                                     <div className="absolute top-4 right-4 sm:top-8 sm:right-8 text-indigo-200 opacity-20 group-hover:rotate-12 transition-transform duration-700">
                                         <Calendar size={80} className="sm:w-[120px] sm:h-[120px]" />

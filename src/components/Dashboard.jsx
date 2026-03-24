@@ -551,14 +551,8 @@ const Dashboard = () => {
                                         </div>
                                     </div>
                                 )) : (
-                                    <div className="text-center py-6 flex flex-col items-center gap-2">
-                                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">No secondary units deployed.</span>
-                                        <button 
-                                            onClick={handleJoinTeam}
-                                            className="text-[9px] font-black uppercase tracking-tighter text-indigo-600 hover:text-indigo-700 transition-colors border-b border-indigo-200"
-                                        >
-                                            Infiltrate Existing Unit
-                                        </button>
+                                    <div className="text-center py-6 text-[10px] font-black uppercase tracking-widest text-slate-400">
+                                        No secondary units deployed.
                                     </div>
                                 )}
                             </div>

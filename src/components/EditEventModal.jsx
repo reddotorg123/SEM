@@ -89,8 +89,7 @@ const EditEventModal = () => {
         noOfTeams: '',
         prizeWon: '',
         teamName: '',
-        customEventType: '',
-        eventTypes: [] // Added for multi-selection
+        customEventType: ''
     });
 
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -127,8 +126,7 @@ const EditEventModal = () => {
                 noOfTeams: event.noOfTeams || '',
                 prizeWon: event.prizeWon || '',
                 teamName: event.teamName || '',
-                customEventType: (event.eventType && !Object.values(EventType).includes(event.eventType)) ? event.eventType : '',
-                eventTypes: Array.isArray(event.eventTypes) ? event.eventTypes : (event.eventType ? event.eventType.split(',').map(s => s.trim()) : [])
+                customEventType: (event.eventType && !Object.values(EventType).includes(event.eventType)) ? event.eventType : ''
             });
         }
     }, [event]);
@@ -171,11 +169,7 @@ const EditEventModal = () => {
                 registrationDeadline: new Date(formData.registrationDeadline),
                 startDate: new Date(formData.startDate),
                 endDate: new Date(formData.endDate),
-                // Filter out 'Other' and add custom type if it exists
-                eventTypes: formData.eventTypes.includes('Other') 
-                    ? [...formData.eventTypes.filter(t => t !== 'Other'), formData.customEventType].filter(Boolean)
-                    : formData.eventTypes,
-                eventType: (formData.eventTypes.includes('Other') ? [...formData.eventTypes.filter(t => t !== 'Other'), formData.customEventType].filter(Boolean) : formData.eventTypes).join(', ')
+                eventType: (formData.eventType === 'Other' && formData.customEventType.trim()) ? formData.customEventType : formData.eventType
             };
 
             await updateEvent(selectedEvent, updates);
@@ -285,50 +279,22 @@ const EditEventModal = () => {
                                                 <input type="text" name="collegeName" value={formData.collegeName} onChange={handleChange} required className="input-premium" />
                                             </div>
                                             <div className="grid grid-cols-2 gap-4">
-                                                <div className="form-group col-span-2">
-                                                    <label className="label-premium">Operational Categories (Multiple Selection)</label>
-                                                    <div className="flex flex-wrap gap-2 mb-3 min-h-[40px] p-4 bg-slate-50 dark:bg-slate-800/40 rounded-2xl border border-slate-100 dark:border-slate-800">
-                                                        {formData.eventTypes.length > 0 ? formData.eventTypes.map((type, i) => (
-                                                            <span key={i} className="px-3 py-1.5 bg-indigo-600 text-white rounded-xl text-[10px] font-black uppercase flex items-center gap-2 shadow-lg shadow-indigo-600/20">
-                                                                {type}
-                                                                <X size={12} className="cursor-pointer hover:text-rose-300" onClick={() => {
-                                                                    setFormData(prev => ({
-                                                                        ...prev,
-                                                                        eventTypes: prev.eventTypes.filter((_, idx) => idx !== i)
-                                                                    }));
-                                                                }} />
-                                                            </span>
-                                                        )) : (
-                                                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest italic pt-1">Select deployment types...</span>
-                                                        )}
-                                                    </div>
-                                                    <div className="grid grid-cols-2 gap-3">
-                                                        <select 
-                                                            className="input-premium"
-                                                            onChange={(e) => {
-                                                                const val = e.target.value;
-                                                                if (!formData.eventTypes.includes(val)) {
-                                                                    setFormData(prev => ({
-                                                                        ...prev,
-                                                                        eventTypes: [...prev.eventTypes, val]
-                                                                    }));
-                                                                }
-                                                            }}
-                                                        >
-                                                            <option value="" disabled selected>Add Category...</option>
-                                                            {Object.values(EventType).map(t => <option key={t} value={t}>{t}</option>)}
-                                                        </select>
-                                                        {formData.eventTypes.includes('Other') && (
-                                                            <input 
-                                                                type="text" 
-                                                                name="customEventType" 
-                                                                value={formData.customEventType} 
-                                                                onChange={handleChange} 
-                                                                className="input-premium" 
-                                                                placeholder="Specify Identity..." 
-                                                            />
-                                                        )}
-                                                    </div>
+                                                <div className="form-group">
+                                                    <label className="label-premium">Category</label>
+                                                    <select name="eventType" value={formData.eventType} onChange={handleChange} required className="input-premium">
+                                                        {Object.values(EventType).map(t => <option key={t} value={t}>{t}</option>)}
+                                                    </select>
+                                                    {formData.eventType === 'Other' && (
+                                                        <input 
+                                                            type="text" 
+                                                            name="customEventType" 
+                                                            value={formData.customEventType} 
+                                                            onChange={handleChange} 
+                                                            required 
+                                                            className="input-premium mt-2" 
+                                                            placeholder="Specify Event Type" 
+                                                        />
+                                                    )}
                                                 </div>
                                                 <div className="form-group">
                                                     <label className="label-premium">Status</label>
