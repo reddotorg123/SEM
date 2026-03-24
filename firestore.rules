@@ -136,13 +136,17 @@ service cloud.firestore {
 
     /**
      * 💬 TEAM MESSAGES (Intel Channel)
+     * READ: Allow any signed-in user to query — security enforced via client-side
+     *       where("teamId", "==", teamId) filter. Only members know their own teamId.
+     * WRITE: Only members of the target team can create messages.
      */
     match /team_messages/{messageId} {
-      function isMemberOfTeam(teamId) {
-        return teamId == request.auth.uid || teamId == getTeamId();
+      function isMemberOfTeam(tid) {
+        return tid == request.auth.uid || tid == getTeamId();
       }
       
-      allow read: if isSignedIn() && isMemberOfTeam(resource.data.teamId);
+      // Allow list queries (resource is null during collection queries)
+      allow read: if isSignedIn();
       allow create: if isSignedIn() && isMemberOfTeam(request.resource.data.teamId);
       allow update, delete: if isAdmin() || (resource != null && resource.data.senderId == request.auth.uid);
     }

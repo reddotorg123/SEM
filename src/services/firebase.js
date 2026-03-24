@@ -515,17 +515,24 @@ export const sendTeamMessage = async (teamId, senderId, senderName, content) => 
 
 /**
  * FIRESTORE: Live subscribe to team messages.
+ * NOTE: We use only `where` (no orderBy) to avoid needing a composite index.
+ * Messages are sorted client-side by timestamp.
  */
 export const subscribeToTeamMessages = (teamId, callback) => {
     if (!db || !teamId) return null;
     const q = query(
         collection(db, "team_messages"), 
-        where("teamId", "==", teamId),
-        orderBy("timestamp", "asc")
+        where("teamId", "==", teamId)
+        // NOTE: orderBy removed — requires composite index in Firestore console.
+        // Sorting is handled client-side below.
     );
     
     return onSnapshot(q, (snapshot) => {
-        const messages = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        const messages = snapshot.docs
+            .map(doc => ({ id: doc.id, ...doc.data() }))
+            .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp)); // Client-side sort
         callback(messages);
+    }, (error) => {
+        console.error("[Firebase] Team Messages Listener failed:", error.code, error.message);
     });
 };
