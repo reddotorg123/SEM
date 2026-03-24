@@ -149,6 +149,14 @@ export const subscribeToUserData = (uid, callback) => {
                 hasSubscription: !!data.hasSubscription,
                 position: data.position || 'Explorer'
             });
+        } else {
+            // New user or missing profile - default to lone wolf public
+            callback({ 
+                role: "public", 
+                teamId: uid, 
+                hasSubscription: false, 
+                position: 'Explorer' 
+            });
         }
     });
 };
@@ -532,8 +540,7 @@ export const sendTeamMessage = async (teamId, senderId, senderName, content) => 
         senderId,
         senderName,
         content,
-        // Use serverTimestamp for Firestore consistency, fall back to local for speed
-        timestamp: serverTimestamp()
+        timestamp: new Date().toISOString()
     });
 };
 
@@ -553,20 +560,8 @@ export const subscribeToTeamMessages = (teamId, callback) => {
     
     return onSnapshot(q, (snapshot) => {
         const messages = snapshot.docs
-            .map(doc => {
-                const data = doc.data();
-                // Safe timestamp conversion (handles ISO strings and Firestore Timestamps)
-                let date;
-                if (data.timestamp?.toDate) date = data.timestamp.toDate();
-                else date = new Date(data.timestamp || Date.now());
-
-                return { 
-                    id: doc.id, 
-                    ...data, 
-                    dateObject: date 
-                };
-            })
-            .sort((a, b) => a.dateObject - b.dateObject);
+            .map(doc => ({ id: doc.id, ...doc.data() }))
+            .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp)); // Client-side sort
         callback(messages);
     }, (error) => {
         console.error("[Firebase] Team Messages Listener failed:", error.code, error.message);

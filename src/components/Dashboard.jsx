@@ -91,25 +91,16 @@ const Dashboard = () => {
     const [newPosition, setNewPosition] = useState('');
     const msgEndRef = useRef(null);
     const [subDetails, setSubDetails] = useState(null);
-    const [activeTeamId, setActiveTeamId] = useState(teamId || (user ? user.uid : null));
 
-    // Sync activeTeamId when user or teamId state changes
+    // Fetch Team Members
     useEffect(() => {
-        if (user) {
-            setActiveTeamId(teamId || user.uid);
-        }
-    }, [teamId, user]);
-
-    // Fetch Team Members & Messages
-    useEffect(() => {
-        if (activeTeamId) {
-            let unsubscribeMembers = () => {};
-            getTeamMembers(activeTeamId).then(members => {
+        if (teamId) {
+            const unsubscribeMembers = getTeamMembers(teamId).then(members => {
                 setTeamMembers(members);
             });
             
             // Real-time messages
-            const unsubscribeMessages = subscribeToTeamMessages(activeTeamId, (msgs) => {
+            const unsubscribeMessages = subscribeToTeamMessages(teamId, (msgs) => {
                 setMessages(msgs);
             });
 
@@ -117,7 +108,7 @@ const Dashboard = () => {
                 if (unsubscribeMessages) unsubscribeMessages();
             };
         }
-    }, [activeTeamId]);
+    }, [teamId]);
 
     // Check subscription and expiry
     useEffect(() => {
@@ -154,7 +145,7 @@ const Dashboard = () => {
     const events = useLiveQuery(async () => {
         const { getMergedEvents } = await import('../db');
         return await getMergedEvents();
-    }, [activeTeamId]) || [];
+    }, [teamId]) || [];
 
     // Dashboard Statistics with useMemo
     const upcomingEvents = useMemo(() => {
@@ -256,10 +247,9 @@ const Dashboard = () => {
 
     const handleSendMessage = async (e) => {
         e.preventDefault();
-        const tid = activeTeamId || teamId || user?.uid;
-        if (!newMessage.trim() || !tid || !user) return;
+        if (!newMessage.trim()) return;
         try {
-            await sendTeamMessage(tid, user.uid, user.displayName || user.email?.split('@')[0] || 'Unknown', newMessage);
+            await sendTeamMessage(teamId, user.uid, user.displayName, newMessage);
             setNewMessage('');
         } catch (err) {
             console.error("Message failed", err);
@@ -352,15 +342,6 @@ const Dashboard = () => {
                                     <FileUp size={18} className="sm:w-6 sm:h-6" />
                                 </button>
                             </>
-                        )}
-                        {(user?.uid === teamId && userRole !== 'admin') && (
-                            <button
-                                onClick={handleJoinTeam}
-                                className="px-5 sm:px-8 h-12 sm:h-16 bg-indigo-600 text-white rounded-[1.25rem] sm:rounded-3xl font-black text-[10px] sm:text-sm uppercase tracking-widest shadow-2xl hover:scale-105 active:scale-95 transition-all flex items-center gap-2 sm:gap-3 border border-white/20"
-                            >
-                                <Users size={18} className="sm:w-5 sm:h-5" />
-                                JOIN UNIT
-                            </button>
                         )}
                     </div>
                 </div>
@@ -512,6 +493,166 @@ const Dashboard = () => {
                         )}
                     </div>
 
+                    {/* Tactical Unit (Team Members) */}
+                    <div className="relative group pt-8">
+                        <div className="absolute inset-0 bg-indigo-600 rounded-[2.5rem] blur-[30px] opacity-10 group-hover:opacity-20 transition-opacity" />
+                        <div className="relative bg-white dark:bg-slate-900 rounded-2xl sm:rounded-[2.5rem] border border-indigo-600/20 overflow-hidden shadow-2xl p-5 sm:p-8">
+                            <div className="flex items-center justify-between mb-8">
+                                <h3 className="text-xl font-black text-slate-900 dark:text-white flex items-center gap-3 uppercase tracking-tighter">
+                                    <Users size={24} className="text-indigo-600" />
+                                    Tactical Unit
+                                </h3>
+                                <div className="px-3 py-1 bg-indigo-50 dark:bg-indigo-900/40 text-indigo-600 text-[9px] font-black uppercase tracking-widest rounded-lg border border-indigo-100">
+                                    {teamMembers.length || 1} OPERATIVE(S)
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 gap-4">
+                                {teamMembers.length > 0 ? teamMembers.map((member, idx) => (
+                                    <div key={member.id || idx} className="group/member flex items-center gap-4 p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 hover:border-indigo-500/30 transition-all">
+                                        <div className="w-12 h-12 rounded-xl bg-indigo-600 overflow-hidden flex items-center justify-center text-white font-black text-sm shadow-lg shadow-indigo-500/20">
+                                            {member.photoURL ? (
+                                                <img src={member.photoURL} alt={member.displayName} className="w-full h-full object-cover" />
+                                            ) : (
+                                                (member.displayName || 'OP').substring(0, 2).toUpperCase()
+                                            )}
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex items-center gap-2">
+                                                <p className="text-sm font-black text-slate-900 dark:text-white truncate uppercase tracking-wider">{member.displayName || 'Unknown Unit'}</p>
+                                                {member.id === teamId && <Crown size={12} className="text-amber-500" title="Team Leader" />}
+                                                {member.id === user.uid && <span className="px-1.5 py-0.5 rounded-md bg-indigo-50 dark:bg-indigo-900/40 text-[8px] font-black text-indigo-600 uppercase">You</span>}
+                                            </div>
+                                            
+                                            {editingMember === member.id ? (
+                                                <div className="flex items-center gap-2 mt-1">
+                                                    <input 
+                                                        autoFocus
+                                                        value={newPosition}
+                                                        onChange={(e) => setNewPosition(e.target.value)}
+                                                        className="flex-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md px-2 py-1 text-[10px] font-bold text-slate-900 dark:text-white"
+                                                    />
+                                                    <button onClick={() => handleUpdatePosition(member.id)} className="p-1 px-1.5 bg-indigo-600 text-white rounded text-[10px] font-black"><Check size={10} /></button>
+                                                    <button onClick={() => setEditingMember(null)} className="p-1 px-1.5 bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-400 rounded text-[10px] font-black"><X size={10} /></button>
+                                                </div>
+                                            ) : (
+                                                <div className="flex items-center justify-between">
+                                                    <p className="text-[10px] font-bold text-indigo-500 uppercase tracking-widest mt-0.5">{member.position || 'Explorer'}</p>
+                                                    {user.uid === teamId && (
+                                                        <button 
+                                                            onClick={() => { setEditingMember(member.id); setNewPosition(member.position || 'Explorer'); }}
+                                                            className="opacity-0 group-hover/member:opacity-100 p-1 text-slate-400 hover:text-indigo-600 transition-all"
+                                                        >
+                                                            <Edit2 size={12} />
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                )) : (
+                                    <div className="text-center py-6 flex flex-col items-center gap-2">
+                                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">No secondary units deployed.</span>
+                                        <button 
+                                            onClick={handleJoinTeam}
+                                            className="text-[9px] font-black uppercase tracking-tighter text-indigo-600 hover:text-indigo-700 transition-colors border-b border-indigo-200"
+                                        >
+                                            Infiltrate Existing Unit
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3 mt-6">
+                                {user.uid !== teamId ? (
+                                    <button 
+                                        onClick={handleLeaveTeam}
+                                        className="w-full py-4 bg-rose-50 dark:bg-rose-900/40 text-rose-600 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-rose-100 transition-all flex items-center justify-center gap-2"
+                                    >
+                                        <LogOut size={14} /> Leave Team
+                                    </button>
+                                ) : (
+                                    userRole === 'public' ? (
+                                        <button 
+                                            onClick={handleJoinTeam}
+                                            className="w-full py-4 bg-indigo-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:scale-105 transition-all flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/20"
+                                        >
+                                            <Users size={14} /> Join Unit
+                                        </button>
+                                    ) : (
+                                        <button 
+                                            onClick={() => openModal('teamInvite')}
+                                            className="w-full py-4 bg-indigo-50 dark:bg-indigo-900/40 text-indigo-600 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-100 transition-all flex items-center justify-center gap-2"
+                                        >
+                                            <Plus size={14} /> Invite Members
+                                        </button>
+                                    )
+                                )}
+                                <button 
+                                    onClick={() => setIsChatOpen(!isChatOpen)}
+                                    className={cn(
+                                        "w-full py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2",
+                                        isChatOpen ? "bg-indigo-600 text-white shadow-lg shadow-indigo-500/20" : "bg-indigo-50 dark:bg-indigo-900/40 text-indigo-600 hover:bg-indigo-100"
+                                    )}
+                                >
+                                    <MessageSquare size={14} /> {isChatOpen ? 'Close Intel' : 'Team Intel'}
+                                </button>
+                            </div>
+
+                            {/* Team Messenger Section */}
+                            <AnimatePresence>
+                                {isChatOpen && (
+                                    <motion.div
+                                        initial={{ height: 0, opacity: 0 }}
+                                        animate={{ height: 'auto', opacity: 1 }}
+                                        exit={{ height: 0, opacity: 0 }}
+                                        className="mt-6 pt-6 border-t border-indigo-600/10 overflow-hidden"
+                                    >
+                                        <div className="bg-slate-50 dark:bg-slate-800/50 rounded-2xl p-4 flex flex-col h-[300px]">
+                                            <div className="flex-1 overflow-y-auto space-y-3 mb-4 pr-2 custom-scrollbar">
+                                                {messages.length > 0 ? messages.map((msg, i) => (
+                                                    <div key={msg.id || i} className={cn("flex flex-col", msg.senderId === user.uid ? "items-end" : "items-start")}>
+                                                        <div className="flex items-center gap-2 mb-1">
+                                                            <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">{msg.senderName || 'Unknown'}</span>
+                                                            <span className="text-[7px] text-slate-500">{format(new Date(msg.timestamp), 'HH:mm')}</span>
+                                                        </div>
+                                                        <div className={cn(
+                                                            "px-4 py-2 rounded-2xl text-xs font-bold max-w-[85%] break-words",
+                                                            msg.senderId === user.uid ? "bg-indigo-600 text-white rounded-tr-none" : "bg-white dark:bg-slate-900 text-slate-900 dark:text-white border border-slate-100 dark:border-slate-800 rounded-tl-none shadow-sm"
+                                                        )}>
+                                                            {msg.content}
+                                                        </div>
+                                                    </div>
+                                                )) : (
+                                                    <div className="h-full flex flex-col items-center justify-center text-center p-6">
+                                                        <MessageSquare size={32} className="text-slate-200 mb-2" />
+                                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">No intel decoded yet.</p>
+                                                    </div>
+                                                )}
+                                                <div ref={msgEndRef} />
+                                            </div>
+                                            
+                                            <form onSubmit={handleSendMessage} className="relative">
+                                                <input 
+                                                    type="text"
+                                                    value={newMessage}
+                                                    onChange={(e) => setNewMessage(e.target.value)}
+                                                    placeholder="Send tactical intel..."
+                                                    className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-4 py-3 text-xs font-bold text-slate-900 dark:text-white pr-12 focus:ring-2 focus:ring-indigo-500 transition-all outline-none"
+                                                />
+                                                <button 
+                                                    type="submit"
+                                                    className="absolute right-2 top-1.5 w-9 h-9 bg-indigo-600 text-white rounded-lg flex items-center justify-center hover:scale-105 active:scale-95 transition-transform"
+                                                >
+                                                    <Send size={14} strokeWidth={3} />
+                                                </button>
+                                            </form>
+                                        </div>
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
+                        </div>
+                    </div>
                 </div>
 
                 {/* Right Column */}
