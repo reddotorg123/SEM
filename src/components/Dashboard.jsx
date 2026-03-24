@@ -234,6 +234,17 @@ const Dashboard = () => {
         }
     };
 
+    const handleJoinTeam = async () => {
+        const targetTeamId = window.prompt("Enter the Tactical Unit ID to join:");
+        if (!targetTeamId) return;
+        
+        try {
+            navigate(`/invite/${targetTeamId}`);
+        } catch (err) {
+            alert("Deployment failed: " + err.message);
+        }
+    };
+
     const handleSendMessage = async (e) => {
         e.preventDefault();
         if (!newMessage.trim()) return;
@@ -547,20 +558,29 @@ const Dashboard = () => {
                             </div>
 
                             <div className="grid grid-cols-2 gap-3 mt-6">
-                                {userRole === 'subscriber' || user.uid === teamId ? (
-                                    <button 
-                                        onClick={() => openModal('teamInvite')}
-                                        className="w-full py-4 bg-indigo-50 dark:bg-indigo-900/40 text-indigo-600 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-100 transition-all flex items-center justify-center gap-2"
-                                    >
-                                        <Plus size={14} /> Invite Members
-                                    </button>
-                                ) : (
+                                {user.uid !== teamId ? (
                                     <button 
                                         onClick={handleLeaveTeam}
                                         className="w-full py-4 bg-rose-50 dark:bg-rose-900/40 text-rose-600 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-rose-100 transition-all flex items-center justify-center gap-2"
                                     >
                                         <LogOut size={14} /> Leave Team
                                     </button>
+                                ) : (
+                                    userRole === 'public' ? (
+                                        <button 
+                                            onClick={handleJoinTeam}
+                                            className="w-full py-4 bg-indigo-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:scale-105 transition-all flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/20"
+                                        >
+                                            <Users size={14} /> Join Unit
+                                        </button>
+                                    ) : (
+                                        <button 
+                                            onClick={() => openModal('teamInvite')}
+                                            className="w-full py-4 bg-indigo-50 dark:bg-indigo-900/40 text-indigo-600 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-100 transition-all flex items-center justify-center gap-2"
+                                        >
+                                            <Plus size={14} /> Invite Members
+                                        </button>
+                                    )
                                 )}
                                 <button 
                                     onClick={() => setIsChatOpen(!isChatOpen)}
