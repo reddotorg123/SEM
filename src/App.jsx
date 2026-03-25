@@ -80,8 +80,21 @@ class ErrorBoundary extends React.Component {
     }
 }
 
-function AnimatedRoutes() {
+function AnimatedRoutes({ user }) {
     const location = useLocation();
+
+    // If not logged in, only allow the /invite route
+    if (!user) {
+        return (
+            <AnimatePresence mode="wait">
+                <Routes location={location} key={location.pathname}>
+                    <Route path="/invite/:teamId" element={<Suspense fallback={null}><JoinTeam /></Suspense>} />
+                    <Route path="*" element={null} />
+                </Routes>
+            </AnimatePresence>
+        );
+    }
+
     return (
         <AnimatePresence mode="wait">
             <Routes location={location} key={location.pathname}>
@@ -272,6 +285,9 @@ function App() {
         return () => clearInterval(interval);
     }, []);
 
+    // Check if current URL is an invite link (for unauthenticated users)
+    const isInviteUrl = window.location.pathname.startsWith('/invite/');
+
     return (
         <ErrorBoundary>
             {/* Splash Screen (High Z-Index) */}
@@ -280,8 +296,8 @@ function App() {
             {/* Main Application Content */}
             {/* We render the main app only when NOT loading, but we keep Splash on top until it completes */}
             <div className={cn("contents", isLoading && "hidden")}>
-                {user ? (
-                    <Router>
+                <Router>
+                    {user ? (
                         <div className="min-h-screen bg-gray-50 dark:bg-[#0f172a] transition-colors duration-500 pb-24 lg:pb-0">
                             {/* Fixed Header */}
                             <div className="sticky top-0 z-[60]">
@@ -306,13 +322,22 @@ function App() {
 
                             {/* Main Content Area */}
                             <main className="container mx-auto px-3 sm:px-4 py-4 sm:py-6 max-w-7xl">
-                                <AnimatedRoutes />
+                                <AnimatedRoutes user={user} />
                             </main>
                         </div>
-                    </Router>
-                ) : (
-                    !isLoading && <Login />
-                )}
+                    ) : (
+                        /* When not logged in: show JoinTeam for invite URLs, Login for everything else */
+                        isInviteUrl ? (
+                            <div className="min-h-screen bg-gray-50 dark:bg-[#0f172a] transition-colors duration-500">
+                                <main className="container mx-auto px-3 sm:px-4 py-4 sm:py-6 max-w-7xl">
+                                    <AnimatedRoutes user={null} />
+                                </main>
+                            </div>
+                        ) : (
+                            !isLoading && <Login />
+                        )
+                    )}
+                </Router>
             </div>
         </ErrorBoundary>
     );
