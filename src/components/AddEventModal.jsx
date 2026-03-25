@@ -47,7 +47,7 @@ const AddEventModal = () => {
     const [formData, setFormData] = useState({
         collegeName: '',
         eventName: '',
-        eventType: EventType.HACKATHON,
+        eventType: [EventType.HACKATHON],
         customEventType: '',
         registrationDeadline: '',
         startDate: '',
@@ -114,7 +114,7 @@ const AddEventModal = () => {
                 eventName: lines[0] || prev.eventName,
                 prizeAmount: extractedText.match(/(?:(?:INR|₹|Prize|Worth)\.?\s*)([0-9,]+)/i)?.[1].replace(/,/g, '') || prev.prizeAmount,
                 description: `AI ANALYZED: ${extractedText.substring(0, 100)}...`,
-                eventType: textLower.includes('hack') ? EventType.HACKATHON : EventType.CONTEST
+                eventType: textLower.includes('hack') ? [EventType.HACKATHON] : [EventType.CONTEST]
             }));
 
             alert('SYSTEM: Neural Protocol Complete. Data successfully injected into form matrix.');
@@ -141,11 +141,13 @@ const AddEventModal = () => {
         try {
             const { teamId, user, userRole } = useAppStore.getState();
             const isAdmin = userRole === 'admin' || userRole === 'event_manager';
-            const actualEventType = (formData.eventType === EventType.OTHER && formData.customEventType.trim()) ? formData.customEventType : formData.eventType;
+            const actualEventTypes = formData.eventType.map(t => 
+                (t === EventType.OTHER && formData.customEventType.trim()) ? formData.customEventType.trim() : t
+            );
             
             const eventData = {
                 ...formData,
-                eventType: actualEventType,
+                eventType: actualEventTypes,
                 prizeAmount: parseFloat(formData.prizeAmount) || 0,
                 prizeWon: parseFloat(formData.prizeWon) || 0,
                 registrationFee: parseFloat(formData.registrationFee) || 0,
@@ -233,35 +235,58 @@ const AddEventModal = () => {
                                         <label className="label-premium">College Name</label>
                                         <input type="text" name="collegeName" value={formData.collegeName} onChange={handleChange} required={activeTab === 'basic'} className="input-premium" placeholder="Host College Name" />
                                     </div>
-                                    <div className="grid grid-cols-2 gap-3 sm:gap-4">
-                                        <div className="form-group">
-                                            <label className="label-premium">Event Type</label>
-                                            <select name="eventType" value={formData.eventType} onChange={handleChange} required={activeTab === 'basic'} className="input-premium">
-                                                {Object.values(EventType).map(t => <option key={t} value={t}>{t}</option>)}
-                                            </select>
-                                            {formData.eventType === EventType.OTHER && (
+                                        <div className="form-group col-span-2">
+                                            <label className="label-premium">Event Categories (Select Multiple)</label>
+                                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-2">
+                                                {Object.values(EventType).map(t => (
+                                                    <label key={t} className={cn(
+                                                        "flex items-center gap-2 p-2 rounded-xl border transition-all cursor-pointer text-[9px] font-black uppercase tracking-wider",
+                                                        formData.eventType.includes(t) 
+                                                            ? "bg-indigo-600 text-white border-indigo-600 shadow-lg shadow-indigo-500/20" 
+                                                            : "bg-white dark:bg-slate-900 text-slate-500 border-slate-100 dark:border-slate-800 hover:border-indigo-300"
+                                                    )}>
+                                                        <input 
+                                                            type="checkbox" 
+                                                            className="hidden" 
+                                                            checked={formData.eventType.includes(t)}
+                                                            onChange={(e) => {
+                                                                const checked = e.target.checked;
+                                                                setFormData(prev => ({
+                                                                    ...prev,
+                                                                    eventType: checked 
+                                                                        ? [...prev.eventType, t]
+                                                                        : prev.eventType.filter(type => type !== t)
+                                                                }));
+                                                            }}
+                                                        />
+                                                        {t}
+                                                    </label>
+                                                ))}
+                                            </div>
+                                            {(Array.isArray(formData.eventType) ? formData.eventType : [formData.eventType]).includes(EventType.OTHER) && (
                                                 <input 
                                                     type="text" 
                                                     name="customEventType" 
                                                     value={formData.customEventType} 
                                                     onChange={handleChange} 
                                                     required={activeTab === 'basic'} 
-                                                    className="input-premium mt-2" 
-                                                    placeholder="Specify Event Type (e.g. Workshop)" 
+                                                    className="input-premium mt-3" 
+                                                    placeholder="Specify Custom Event Type" 
                                                 />
                                             )}
                                         </div>
+                                    <div className="grid grid-cols-2 gap-x-4">
                                         <div className="form-group">
                                             <label className="label-premium">Team Size</label>
                                             <input type="number" name="teamSize" value={formData.teamSize} onChange={handleChange} className="input-premium" min="1" />
                                         </div>
-                                        {parseInt(formData.teamSize) > 1 && (
-                                            <div className="form-group col-span-2">
-                                                <label className="label-premium">Team Name</label>
-                                                <input type="text" name="teamName" value={formData.teamName} onChange={handleChange} className="input-premium" placeholder="e.g. The Avengers" />
-                                            </div>
-                                        )}
                                     </div>
+                                    {parseInt(formData.teamSize) > 1 && (
+                                        <div className="form-group">
+                                            <label className="label-premium">Team Name</label>
+                                            <input type="text" name="teamName" value={formData.teamName} onChange={handleChange} className="input-premium" placeholder="e.g. The Avengers" />
+                                        </div>
+                                    )}
                                 </div>
                                 <div className="bg-slate-50 dark:bg-slate-800/40 p-6 sm:p-10 rounded-2xl sm:rounded-[2.5rem] border-2 border-dashed border-slate-200 dark:border-slate-800 relative group">
                                     <div className="absolute top-4 right-4 sm:top-8 sm:right-8 text-indigo-200 opacity-20 group-hover:rotate-12 transition-transform duration-700">

@@ -519,18 +519,18 @@ const AdminPanel = () => {
                                                 <span className="font-bold text-slate-700 text-sm">{selectedUser.mobile || '--'}</span>
                                             </div>
                                         </div>
-                                        <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100 flex items-center gap-4">
-                                            <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center text-slate-400"><BookOpen size={16} /></div>
+                                        <div className="p-4 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center gap-4">
+                                            <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center text-indigo-400 shadow-sm"><Trophy size={16} /></div>
                                             <div>
-                                                <span className="block text-[8px] font-black uppercase text-slate-400 tracking-widest">Registration No</span>
-                                                <span className="font-bold text-slate-700 text-sm">{selectedUser.regNo || '--'}</span>
+                                                <span className="block text-[8px] font-black uppercase text-indigo-400 tracking-widest">Network XP</span>
+                                                <span className="font-black text-indigo-700 text-lg leading-none">{selectedUser.persistentStats?.totalXP?.toLocaleString() || '0'} XP</span>
                                             </div>
                                         </div>
-                                        <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100 flex items-center gap-4">
-                                            <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center text-slate-400"><Building2 size={16} /></div>
+                                        <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-100 flex items-center gap-4">
+                                            <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center text-emerald-500 shadow-sm"><Calendar size={16} /></div>
                                             <div>
-                                                <span className="block text-[8px] font-black uppercase text-slate-400 tracking-widest">Institution</span>
-                                                <span className="font-bold text-slate-700 text-sm truncate max-w-[150px] block">{selectedUser.college || '--'}</span>
+                                                <span className="block text-[8px] font-black uppercase text-emerald-500 tracking-widest">Missions (Won/Total)</span>
+                                                <span className="font-bold text-emerald-700 text-sm leading-none">{selectedUser.persistentStats?.winCount || 0} / {selectedUser.persistentStats?.totalEvents || 0}</span>
                                             </div>
                                         </div>
                                     </div>
@@ -540,6 +540,13 @@ const AdminPanel = () => {
                                             <div>
                                                 <span className="block text-[8px] font-black uppercase text-slate-400 tracking-widest">Locality</span>
                                                 <span className="font-bold text-slate-700 text-sm">{selectedUser.locality || '--'}</span>
+                                            </div>
+                                        </div>
+                                        <div className="p-4 rounded-2xl bg-amber-50 border border-amber-100 flex items-center gap-4">
+                                            <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center text-amber-500 shadow-sm"><CreditCard size={16} /></div>
+                                            <div>
+                                                <span className="block text-[8px] font-black uppercase text-amber-500 tracking-widest">Total Prizes Won</span>
+                                                <span className="font-bold text-amber-700 text-sm">₹{selectedUser.persistentStats?.totalPrize?.toLocaleString() || '0'}</span>
                                             </div>
                                         </div>
                                         <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100 flex items-center gap-4">

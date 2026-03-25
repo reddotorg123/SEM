@@ -4,13 +4,13 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { db } from '../db';
 import { useAppStore } from '../store';
 import EventCard from './EventCard';
-import { TrendingUp, Calendar, Clock, Trophy, Plus, FileUp, Zap, Sparkles, Shield, Bell, Target, ArrowRight, Users, User, Crown } from 'lucide-react';
+import { TrendingUp, Calendar, Clock, Trophy, Plus, FileUp, Zap, Sparkles, Shield, Bell, Target, ArrowRight, Users, User, Crown, Edit2, Check, X, LogOut, MessageSquare, Send } from 'lucide-react';
 import { useNavigate, Link } from 'react-router-dom';
 import { format, isToday, isThisWeek, differenceInDays, startOfDay, addDays, isAfter, isBefore } from 'date-fns';
 import { cn } from '../utils';
-import { getTeamMembers, leaveTeam, sendTeamMessage, subscribeToTeamMessages, updateMemberPosition } from '../services/firebase';
-import { Send, LogOut, MessageSquare, Edit2, Check, X } from 'lucide-react';
+import { getTeamMembers, leaveTeam, sendTeamMessage, subscribeToTeamMessages, updateMemberPosition, updateUserStats } from '../services/firebase';
 import { useRef } from 'react';
+import { showNotification } from '../notifications';
 
 const StatCard = ({ title, value, icon: Icon, color, delay, trend, onClick }) => {
     // Mapping of possible colors to explicit Tailwind classes (SEM Theme)
@@ -100,6 +100,18 @@ const Dashboard = () => {
             
             // Real-time messages
             const unsubscribeMessages = subscribeToTeamMessages(teamId, (msgs) => {
+                // If we get a NEW message and the chat is closed or the window is not focused
+                // AND it's not our own message
+                if (msgs.length > messages.length && messages.length > 0) {
+                    const latest = msgs[msgs.length - 1];
+                    if (latest.senderId !== user.uid && (!isChatOpen || document.hidden)) {
+                        showNotification(`New Intel: ${latest.senderName}`, {
+                            body: latest.content,
+                            tag: 'team-chat',
+                            icon: '/pwa-192x192.png'
+                        });
+                    }
+                }
                 setMessages(msgs);
             });
 
@@ -175,6 +187,32 @@ const Dashboard = () => {
 
     const isRoleVerified = useAppStore((state) => state.isRoleVerified);
     const canManage = (userRole === 'admin' || userRole === 'event_manager') && isRoleVerified;
+
+    useEffect(() => {
+        if (!user?.uid || !stats) return;
+        
+        // Debounce calculation to avoid excessive Firestore writes during active Dexie syncing
+        const timer = setTimeout(() => {
+            const xp = (stats.winCount * 1500) + (events.filter(e => e.status === 'Attended').length * 500);
+            const userStats = {
+                totalEvents: stats.total,
+                upcomingCount: stats.upcomingCount,
+                winCount: stats.winCount,
+                totalPrize: stats.totalPrize,
+                totalXP: xp
+            };
+            
+            // Sync to personal user profile
+            updateUserStats(user.uid, userStats);
+            
+            // Sync to Team Leader profile if operating inside a team
+            if (teamId && teamId !== user.uid) {
+               updateUserStats(teamId, userStats); 
+            }
+        }, 5000); // 5 sec debounce
+        
+        return () => clearTimeout(timer);
+    }, [stats.total, stats.winCount, stats.totalPrize, user?.uid, teamId]);
 
     const handleLeaveTeam = async () => {
         if (!window.confirm("Are you sure you want to leave this team? You will return to your personal workspace.")) return;

@@ -46,7 +46,14 @@ const JoinTeam = () => {
         // if (userRole === 'public') { ... removed this barrier ... }
 
         if (userRole === 'subscriber' || userRole === 'team_leader' || userRole === 'admin') {
-            setErrorMsg("You are already a Team Leader or Admin. You cannot join another team.");
+            setErrorMsg("You are already a Team Leader or Admin. You cannot join another team. You must first downgrade your role to 'public' to join a different team.");
+            setStatus('error');
+            return;
+        }
+
+        const { teamId: currentTeamId } = useAppStore.getState();
+        if (currentTeamId && currentTeamId !== user.uid && currentTeamId !== teamId) {
+            setErrorMsg("You are already in another team. Please leave your current team before joining this one.");
             setStatus('error');
             return;
         }

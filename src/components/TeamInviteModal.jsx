@@ -85,9 +85,10 @@ const TeamInviteModal = () => {
             const targetUser = querySnapshot.docs[0];
             const targetUserId = targetUser.id;
 
-            // 2. Check if already in a team
-            if (targetUser.data().teamId) {
-                setAddStatus({ type: 'error', msg: 'User is already in a team.' });
+            // 2. Check if already in a team (teamId exists and is DIFFERENT from their own uid)
+            const targetData = targetUser.data();
+            if (targetData.teamId && targetData.teamId !== targetUserId) {
+                setAddStatus({ type: 'error', msg: 'User is already in another team. They must leave it first.' });
                 return;
             }
 
@@ -111,7 +112,7 @@ const TeamInviteModal = () => {
         if (!window.confirm("Remove this unit from your Tactical Unit?")) return;
         try {
             await updateDoc(doc(db, "users", uid), {
-                teamId: null,
+                teamId: uid,
                 role: 'public'
             });
             fetchMembers();

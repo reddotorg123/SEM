@@ -172,7 +172,7 @@ const EventCard = React.memo(({ event, compact = false }) => {
                 {/* Header Row: Type + Actions */}
                 <div className="flex items-start justify-between mb-2">
                     <span className="px-2 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 text-[9px] font-black uppercase tracking-wider rounded-md">
-                        {event.eventType}
+                        {Array.isArray(event.eventType) ? event.eventType.join(' • ') : event.eventType}
                     </span>
 
                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity no-click">

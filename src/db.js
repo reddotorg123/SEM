@@ -211,7 +211,9 @@ export const calculatePriorityScore = (event) => {
         [EventType.SEMINAR]: 5,
         [EventType.OTHER]: 5
     };
-    score += typeScores[event.eventType] || 5;
+    const eventTypes = Array.isArray(event.eventType) ? event.eventType : [event.eventType];
+    const maxTypeScore = Math.max(...eventTypes.map(t => typeScores[t] || 5));
+    score += maxTypeScore;
 
     const daysRemaining = Math.ceil((deadline - now) / (1000 * 60 * 60 * 24));
     if (daysRemaining < 0) score = 0;

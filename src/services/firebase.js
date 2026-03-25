@@ -289,6 +289,26 @@ export const subscribeToGlobalEvents = (callback, onError) => {
         }));
         console.log(`[Firebase] Global Events Updated: ${events.length}`);
         callback(events);
+
+        // Detect newly added events for Global Notifications
+        snapshot.docChanges().forEach((change) => {
+            if (change.type === "added") {
+                const newEvent = change.doc.data();
+                // Only notify if event was created in the last 2 minutes
+                // (Prevents spamming notifications on initial load of all historical events)
+                if (newEvent.createdAt) {
+                    const ageInMs = new Date() - new Date(newEvent.createdAt);
+                    if (ageInMs < 2 * 60 * 1000) {
+                        import('../notifications').then(({ showNotification }) => {
+                            showNotification(`New Event Alert: ${newEvent.eventName}`, {
+                                body: `A new event is available at ${newEvent.collegeName}`,
+                                tag: `global-event-${change.doc.id}`
+                            });
+                        }).catch(err => console.error("Notification trigger fail:", err));
+                    }
+                }
+            }
+        });
     }, (error) => {
         console.error('[Firebase] Global Events Listener failed:', error);
         if (onError) onError(error);
@@ -424,6 +444,25 @@ export const subscribeToPaymentRequests = (callback) => {
     return onSnapshot(q, (snapshot) => {
         const reqs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         callback(reqs);
+
+        // Detect newly submitted payment requests for Admin Notifications
+        snapshot.docChanges().forEach((change) => {
+            if (change.type === "added") {
+                const req = change.doc.data();
+                // Check if request is recent (last 2 minutes)
+                if (req.createdAt) {
+                    const ageInMs = new Date() - new Date(req.createdAt);
+                    if (ageInMs < 2 * 60 * 1000) {
+                        import('../notifications').then(({ showNotification }) => {
+                            showNotification(`New Access Request: ${req.userName}`, {
+                                body: `${req.userName} has submitted a payment for Verification.`,
+                                tag: `payment-req-${change.doc.id}`
+                            });
+                        }).catch(err => console.error("Notification trigger fail:", err));
+                    }
+                }
+            }
+        });
     });
 };
 
@@ -433,9 +472,15 @@ export const subscribeToPaymentRequests = (callback) => {
 export const approvePaymentRequest = async (requestId, userId, planRole) => {
     if (!db) throw new Error("Firestore not initialized");
 
+    const userSnap = await getDoc(doc(db, "users", userId));
+    const userData = userSnap.exists() ? userSnap.data() : {};
+    
+    // If the user is currently operating in someone else's team, assign 'member'. Otherwise 'subscriber'.
+    const isInTeam = userData.teamId && userData.teamId !== userId;
+    
     // SAFETY: Never allow payment approval to set admin role
     const safeRole = (!planRole || planRole === 'admin' || planRole === 'event_manager') 
-        ? 'subscriber' 
+        ? (isInTeam ? 'member' : 'subscriber') 
         : planRole;
 
     const batch = writeBatch(db);
@@ -535,4 +580,21 @@ export const subscribeToTeamMessages = (teamId, callback) => {
     }, (error) => {
         console.error("[Firebase] Team Messages Listener failed:", error.code, error.message);
     });
+};
+
+/**
+ * FIRESTORE: Updates persistent stats for a user (or team leader) to fulfill the
+ * requirement of explicitly storing individual/team summary data in the database.
+ */
+export const updateUserStats = async (uid, statsData) => {
+    if (!db || !uid) return;
+    try {
+        const userRef = doc(db, "users", uid);
+        await setDoc(userRef, { 
+            persistentStats: statsData,
+            lastStatsSync: new Date().toISOString()
+        }, { merge: true });
+    } catch (error) {
+        console.error("[Firebase] Failed to sync user stats:", error);
+    }
 };

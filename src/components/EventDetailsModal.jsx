@@ -257,9 +257,15 @@ const EventDetailsModal = () => {
                 {/* Header Section */}
                 <div className="bg-gradient-to-r from-indigo-600 via-indigo-700 to-violet-800 px-4 py-3 sm:px-5 sm:py-4 text-white relative shrink-0">
                     <div className="flex items-center gap-1.5 mb-1.5">
-                        <div className="px-1.5 py-0.5 bg-white/20 backdrop-blur-md rounded text-[6px] sm:text-[7px] font-black uppercase tracking-widest border border-white/20">
-                            {event.eventType}
-                        </div>
+                        {Array.isArray(event.eventType) ? event.eventType.map(t => (
+                            <div key={t} className="px-1.5 py-0.5 bg-white/20 backdrop-blur-md rounded text-[6px] sm:text-[7px] font-black uppercase tracking-widest border border-white/20">
+                                {t}
+                            </div>
+                        )) : (
+                            <div className="px-1.5 py-0.5 bg-white/20 backdrop-blur-md rounded text-[6px] sm:text-[7px] font-black uppercase tracking-widest border border-white/20">
+                                {event.eventType}
+                            </div>
+                        )}
                         <div className={cn(
                             "px-1.5 py-0.5 backdrop-blur-md rounded text-[6px] sm:text-[7px] font-black uppercase tracking-widest border",
                             event.status === 'Registered' ? "bg-emerald-500/20 border-emerald-500/20 text-emerald-100" :
