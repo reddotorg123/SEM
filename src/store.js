@@ -59,7 +59,7 @@ export const useAppStore = create(
             // --- AUTH & TEAM IDENTITY ---
             // Stores the current Firebase User object
             user: JSON.parse(localStorage.getItem('sem_user') || 'null'),
-            userRole: localStorage.getItem('sem_user_role') || null, // 'admin', 'event_manager', 'member'
+            userRole: localStorage.getItem('sem_user_role') || 'public', // 'admin', 'event_manager', 'member', 'public'
             teamId: localStorage.getItem('sem_team_id') || null,
             userProfile: JSON.parse(localStorage.getItem('sem_user_profile') || 'null'),
             

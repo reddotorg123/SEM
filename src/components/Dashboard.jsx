@@ -551,7 +551,14 @@ const Dashboard = () => {
                                         >
                                             <LogOut size={14} /> Leave Team
                                         </button>
-                                    ) : userRole === 'public' ? (
+                                    ) : (userRole === 'subscriber' || userRole === 'team_leader' || userRole === 'admin') ? (
+                                        <button 
+                                            onClick={() => openModal('teamInvite')}
+                                            className="w-full py-4 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-black transition-all flex items-center justify-center gap-2 border border-slate-800"
+                                        >
+                                            <Crown size={14} className="text-amber-500" /> Manage Team
+                                        </button>
+                                    ) : (
                                         <button 
                                             onClick={() => {
                                                 const id = window.prompt("Enter Team ID/Code to join:");
@@ -560,13 +567,6 @@ const Dashboard = () => {
                                             className="w-full py-4 bg-indigo-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-700 transition-all flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/20"
                                         >
                                             <Users size={14} /> Join Team
-                                        </button>
-                                    ) : (
-                                        <button 
-                                            onClick={() => openModal('teamInvite')}
-                                            className="w-full py-4 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-black transition-all flex items-center justify-center gap-2 border border-slate-800"
-                                        >
-                                            <Crown size={14} className="text-amber-500" /> Manage Team
                                         </button>
                                     )}
 
