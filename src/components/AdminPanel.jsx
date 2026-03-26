@@ -12,7 +12,7 @@ import {
     MoreVertical, 
     UserPlus, 
     Trash2, 
-    Edit, 
+    Edit2, 
     Plus, 
     Trophy,
     ArrowRight,
@@ -189,7 +189,7 @@ const AdminPanel = () => {
                         </div>
                         <div className="px-3 sm:px-6 py-3 sm:py-4 bg-white/5 backdrop-blur-md rounded-xl sm:rounded-2xl border border-white/10 text-center flex-1 sm:flex-none sm:min-w-[120px]">
                             <span className="block text-[8px] sm:text-[10px] font-black text-slate-500 uppercase tracking-widest mb-1">Teams</span>
-                            <span className="text-lg sm:text-2xl font-black text-emerald-400">{new Set(users.map(u => u.teamId).filter(Boolean)).size || 0}</span>
+                            <span className="text-lg sm:text-2xl font-black text-emerald-400">{new Set((users || []).map(u => u.teamId).filter(Boolean)).size || 0}</span>
                         </div>
                     </div>
                 </div>
@@ -319,7 +319,7 @@ const AdminPanel = () => {
                                                         onClick={() => { setSelectedEvent(event.id); openModal('editEvent'); }}
                                                         className="w-10 h-10 bg-white dark:bg-slate-900 text-slate-400 hover:text-indigo-600 rounded-xl flex items-center justify-center border border-slate-100 dark:border-slate-700 transition-all"
                                                     >
-                                                        <Edit size={16} />
+                                                        <Edit2 size={16} />
                                                     </button>
                                                     <button 
                                                         onClick={() => handleDeleteEvent(event)}
@@ -457,7 +457,7 @@ const AdminPanel = () => {
                                                             </>
                                                         ) : (
                                                             <div className="py-4 rounded-2xl text-center font-black text-[10px] uppercase tracking-[0.2em] border bg-rose-50 text-rose-600 border-rose-200">
-                                                                {req.status}
+                                                                {req.status?.toUpperCase()}
                                                             </div>
                                                         )}
                                                     </div>
@@ -560,7 +560,7 @@ const AdminPanel = () => {
                                             <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center text-slate-400"><Clock size={16} /></div>
                                             <div>
                                                 <span className="block text-[8px] font-black uppercase text-slate-400 tracking-widest">Enrolled Date</span>
-                                                <span className="font-bold text-slate-700 text-sm">{selectedUser.createdAt ? new Date(selectedUser.createdAt).toLocaleDateString() : '--'}</span>
+                                                <span className="font-bold text-slate-700 text-sm">{selectedUser?.createdAt ? new Date(selectedUser.createdAt).toLocaleDateString() : '--'}</span>
                                             </div>
                                         </div>
                                     </div>
