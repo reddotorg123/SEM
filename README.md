@@ -258,21 +258,25 @@ This is a **decision-support platform** that helps you:
 
 ---
 
-## 📄 License
+## 📜 Project Evolution & Recovery Log
 
-MIT License - Built for engineering students by students
+This section tracks major architectural changes and critical updates for easy reference and restoration.
 
----
+### 📅 Session: March 26, 2026 - Infrastructure & Workspace Stability
+- **Tactical Unit Induction (Repair):** Fixed the `JoinTeam.jsx` component to restore induction UI and seat-limit monitoring (Max 10).
+- **Post-Auth Intelligence:** Implemented `sessionStorage` based redirects in `Login.jsx` to return users to their pending invites automatically after sign-in.
+- **Visual Asset Expansion:** Integrated `Neural Link 0 (Poster URL)` fields in both Add and Edit modals for dual-source image handling (File/URL).
+- **Asset Reset Logic:** Standardized "Flush" button behavior to clear both local blobs and remote URLs in real-time.
+- **Admin Layout Sanitization:** Isolated the `AdminPanel` to the `/admin` route to prevent unauthorized access alerts on the global layout.
 
-## 🤝 Contributing
+### 📅 Session: March 25, 2026 - Team Collaboration & Security
+- **Team Join Logic:** Enabled team joining via both Leader UIDs and alphanumeric Invite Codes.
+- **Firestore RBAC:** Optimized security rules to allow team-based data isolation while maintaining global event visibility.
+- **Cloud Notification Prep:** Integrated FCM Service Worker and internal request logic for background alerts.
 
-This is a private productivity tool, but suggestions are welcome!
-
----
-
-## 📞 Support
-
-For issues or questions, check the Settings page for app info.
+### 📅 Session: March 24, 2026 - AI & Event Intelligence
+- **Priority Scoring v2:** Refined scoring algorithms for more accurate event ranking.
+- **AI OCR Integration:** Initial groundwork for Tesseract.js poster scanning.
 
 ---
 

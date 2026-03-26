@@ -7,12 +7,14 @@
 
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../store';
 import { loginUser, registerUser, initFirebase, getUserData } from '../services/firebase';
 import { initNotificationSystem } from '../notifications';
 import { Shield, Lock, Mail, Loader2, AlertCircle } from 'lucide-react';
 
 const Login = () => {
+    const navigate = useNavigate();
     // Component State: Track what the user enters in the form
     const [isRegistering, setIsRegistering] = useState(false);
     const [email, setEmail] = useState('');
@@ -85,6 +87,15 @@ const Login = () => {
                 initNotificationSystem().catch(err => console.error("Notification Init fail:", err));
 
                 setCloudProvider('firestore');   // Activate cloud sync
+
+                // Handle Redirect
+                const pendingInvite = sessionStorage.getItem('pendingInvite');
+                if (pendingInvite) {
+                    sessionStorage.removeItem('pendingInvite');
+                    navigate(`/invite/${pendingInvite}`);
+                } else {
+                    navigate('/');
+                }
             }
         } catch (err) {
             console.error('Auth failure:', err);

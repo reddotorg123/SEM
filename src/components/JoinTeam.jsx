@@ -24,7 +24,6 @@ const JoinTeam = () => {
     useEffect(() => {
         const resolveAndFetch = async () => {
             if (!db || !teamId) {
-                // Wait for DB or handle missing ID
                 if (!teamId) {
                     setErrorMsg("Mission Critical: Team Identifier missing.");
                     setStatus('error');
@@ -44,9 +43,9 @@ const JoinTeam = () => {
                         leaderSnap = directSnap;
                         leaderUid = directSnap.id;
                     }
-                } catch (e) { /* ignore cast errors for invite codes */ }
+                } catch (e) { /* ignore cast errors */ }
 
-                // 2. Attempt Invite Code Resolution (if UID failed)
+                // 2. Attempt Invite Code Resolution
                 if (!leaderSnap) {
                     const q = query(collection(db, 'users'), where('inviteCode', '==', teamId.toUpperCase()));
                     const querySnapshot = await getDocs(q);
@@ -61,7 +60,6 @@ const JoinTeam = () => {
                     setTeamName(`${data.displayName || 'Leader'}'s Tactical Unit`);
                     setResolvedTeamId(leaderUid);
 
-                    // 3. Check Team Capacity (10 members limit)
                     const members = await getTeamMembers(leaderUid);
                     setTeamSize(members.length);
                     
@@ -72,12 +70,12 @@ const JoinTeam = () => {
                         setStatus('idle');
                     }
                 } else {
-                    setErrorMsg("Invalid Intel: Team ID or Code not found in the tactical network.");
+                    setErrorMsg("Invalid Intel: Team ID or Code not found.");
                     setStatus('error');
                 }
             } catch (err) {
                 console.error("Resolution failed", err);
-                setErrorMsg("Communication Failure: Could not sync with the tactical network.");
+                setErrorMsg("Communication Failure: Could not sync with network.");
                 setStatus('error');
             }
         };
@@ -87,23 +85,22 @@ const JoinTeam = () => {
 
     const handleJoinTeam = async () => {
         if (!user) {
-            navigate('/'); // Fallback to login
+            sessionStorage.setItem('pendingInvite', teamId);
+            navigate('/');
             return;
         }
 
         if (!resolvedTeamId) return;
 
-        // Prevent joining own team redundant cycle
         if (resolvedTeamId === user.uid) {
-            setErrorMsg("Operational Paradox: You are already the leader of this workspace.");
+            setErrorMsg("Operational Paradox: You are already the leader.");
             setStatus('error');
             return;
         }
 
-        // Prevent joining if already in someone else's team
         const { teamId: currentTeamId } = useAppStore.getState();
         if (currentTeamId && currentTeamId !== user.uid && currentTeamId !== resolvedTeamId) {
-            setErrorMsg("Deployment Lock: You are currently active in another team. Exit that unit first.");
+            setErrorMsg("Deployment Lock: You are active in another team.");
             setStatus('error');
             return;
         }
@@ -112,8 +109,6 @@ const JoinTeam = () => {
         try {
             if (db && auth?.currentUser) {
                 const userRef = doc(db, 'users', auth.currentUser.uid);
-                
-                // Determine target role (Preserve premium status if they have it)
                 const targetRole = (userRole === 'subscriber' || userRole === 'admin' || userRole === 'event_manager') 
                     ? userRole 
                     : 'member';
@@ -123,19 +118,16 @@ const JoinTeam = () => {
                     teamId: resolvedTeamId
                 });
 
-                // Synchronize Intelligence (Local Store)
                 setUserRole(targetRole);
                 setTeamId(resolvedTeamId);
                 setStatus('success');
 
-                // Mission Success Redirect
                 setTimeout(() => navigate('/'), 2000);
             } else {
-                throw new Error("Encryption Error: Authorization failed.");
+                throw new Error("Authorization failed.");
             }
         } catch (error) {
-            console.error(error);
-            setErrorMsg(error.message || "Operation Failed: Could not induct into unit.");
+            setErrorMsg(error.message || "Operation Failed.");
             setStatus('error');
         }
     };
@@ -147,7 +139,6 @@ const JoinTeam = () => {
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 className="w-full max-w-md bg-white dark:bg-slate-900 rounded-[3rem] shadow-2xl p-10 text-center border border-slate-100 dark:border-slate-800 relative overflow-hidden"
             >
-                {/* Decorative Elements */}
                 <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/5 blur-3xl rounded-full translate-x-10 -translate-y-10" />
                 <div className="absolute bottom-0 left-0 w-32 h-32 bg-indigo-500/5 blur-3xl rounded-full -translate-x-10 translate-y-10" />
 
@@ -189,7 +180,7 @@ const JoinTeam = () => {
                             </button>
                         </div>
                     ) : (
-                        <div className="space-y-6">
+                        <div className="space-y-6 text-left">
                             <div className="bg-indigo-50/50 dark:bg-indigo-900/10 p-6 rounded-[2rem] border border-indigo-100/50 dark:border-indigo-800/50">
                                 <div className="flex justify-between items-center mb-2">
                                     <p className="text-[10px] font-black text-slate-500 uppercase">Unit Strength</p>
@@ -202,11 +193,14 @@ const JoinTeam = () => {
 
                             {!user ? (
                                 <div className="space-y-4">
-                                    <p className="text-[11px] font-bold text-slate-500 leading-relaxed">
+                                    <p className="text-[11px] font-bold text-slate-500 leading-relaxed text-center">
                                         You must establish a secure connection (Login) before you can be inducted into this Tactical Unit.
                                     </p>
                                     <button
-                                        onClick={() => navigate('/')}
+                                        onClick={() => {
+                                            sessionStorage.setItem('pendingInvite', teamId);
+                                            navigate('/');
+                                        }}
                                         className="w-full h-16 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-[1.5rem] font-black uppercase tracking-[0.2em] text-[11px] flex items-center justify-center gap-3 shadow-2xl hover:scale-105 active:scale-95 transition-all"
                                     >
                                         <LogIn size={20} /> Establish Connection
