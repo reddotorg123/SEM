@@ -542,54 +542,89 @@ const Dashboard = () => {
                                 )}
                             </div>
 
-                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-6">
-                                    {/* Action 1: Join or Leave */}
+                                <div className="space-y-4 mt-6">
                                     {teamId && teamId !== user.uid ? (
-                                        <button 
-                                            onClick={handleLeaveTeam}
-                                            className="w-full py-4 bg-rose-50 dark:bg-rose-900/40 text-rose-600 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-rose-100 transition-all flex items-center justify-center gap-2 border border-rose-100 dark:border-rose-800"
-                                        >
-                                            <LogOut size={14} /> Leave Team
-                                        </button>
+                                        /* Team Member View: Leave Option */
+                                        <div className="flex flex-col sm:flex-row gap-3">
+                                            <button 
+                                                onClick={handleLeaveTeam}
+                                                className="flex-1 py-4 bg-rose-50 dark:bg-rose-900/40 text-rose-600 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-rose-100 transition-all flex items-center justify-center gap-2 border border-rose-100 dark:border-rose-800"
+                                            >
+                                                <LogOut size={14} /> Leave Team
+                                            </button>
+                                            <button 
+                                                onClick={() => setIsChatOpen(!isChatOpen)}
+                                                className={cn(
+                                                    "flex-1 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 border",
+                                                    isChatOpen 
+                                                        ? "bg-indigo-600 text-white shadow-lg shadow-indigo-500/20 border-indigo-600" 
+                                                        : "bg-indigo-50 dark:bg-indigo-900/40 text-indigo-600 hover:bg-indigo-100 border-indigo-100 dark:border-indigo-800"
+                                                )}
+                                            >
+                                                <MessageSquare size={14} /> Team Intel
+                                            </button>
+                                        </div>
                                     ) : (userRole === 'subscriber' || userRole === 'team_leader' || userRole === 'admin') ? (
-                                        <button 
-                                            onClick={() => openModal('teamInvite')}
-                                            className="w-full py-4 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-black transition-all flex items-center justify-center gap-2 border border-slate-800"
-                                        >
-                                            <Crown size={14} className="text-amber-500" /> Manage Team
-                                        </button>
+                                        /* Team Leader View: Manage & Intel */
+                                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                            <button 
+                                                onClick={() => openModal('teamInvite')}
+                                                className="w-full py-4 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-black transition-all flex items-center justify-center gap-2 border border-slate-800"
+                                            >
+                                                <Crown size={14} className="text-amber-500" /> Manage
+                                            </button>
+                                            <button
+                                                onClick={() => openModal('teamInvite')}
+                                                className="w-full py-4 bg-indigo-50 dark:bg-indigo-900/40 text-indigo-600 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-100 transition-all flex items-center justify-center gap-2 border border-indigo-100 dark:border-indigo-800"
+                                            >
+                                                <Plus size={14} /> Invite
+                                            </button>
+                                            <button 
+                                                onClick={() => setIsChatOpen(!isChatOpen)}
+                                                className={cn(
+                                                    "w-full py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 border",
+                                                    isChatOpen 
+                                                        ? "bg-indigo-600 text-white shadow-lg shadow-indigo-500/20 border-indigo-600" 
+                                                        : "bg-indigo-50 dark:bg-indigo-900/40 text-indigo-600 hover:bg-indigo-100 border-indigo-100 dark:border-indigo-800"
+                                                )}
+                                            >
+                                                <MessageSquare size={14} /> Intel
+                                            </button>
+                                        </div>
                                     ) : (
-                                        <button 
-                                            onClick={() => {
-                                                const id = window.prompt("Enter Team ID/Code to join:");
-                                                if (id) navigate(`/invite/${id}`);
-                                            }}
-                                            className="w-full py-4 bg-indigo-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-700 transition-all flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/20"
-                                        >
-                                            <Users size={14} /> Join Team
-                                        </button>
+                                        /* Public User View: Join Input */
+                                        <div className="bg-slate-50 dark:bg-slate-800/50 rounded-2xl p-4 border border-slate-100 dark:border-slate-800">
+                                            <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+                                                <Users size={12} /> External Unit Joining
+                                            </h4>
+                                            <div className="flex gap-2">
+                                                <input 
+                                                    id="join-team-input"
+                                                    type="text" 
+                                                    placeholder="Enter Team ID or Invite Code..."
+                                                    className="flex-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-[10px] font-bold outline-none focus:ring-2 focus:ring-indigo-600 transition-all"
+                                                    onKeyDown={(e) => {
+                                                        if (e.key === 'Enter') {
+                                                            const val = e.target.value.trim();
+                                                            if (val) navigate(`/invite/${val}`);
+                                                        }
+                                                    }}
+                                                />
+                                                <button 
+                                                    onClick={() => {
+                                                        const val = document.getElementById('join-team-input').value.trim();
+                                                        if (val) navigate(`/invite/${val}`);
+                                                    }}
+                                                    className="px-4 bg-indigo-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:scale-105 active:scale-95 transition-all shadow-lg shadow-indigo-600/20"
+                                                >
+                                                    Infil
+                                                </button>
+                                            </div>
+                                            <p className="text-[9px] font-bold text-slate-400 mt-3 flex items-center gap-1">
+                                                <Sparkles size={10} className="text-amber-500" /> Enter a leader's UID or custom Invite Code.
+                                            </p>
+                                        </div>
                                     )}
-
-                                    {/* Action 2: Always Invite */}
-                                    <button
-                                        onClick={() => openModal('teamInvite')}
-                                        className="w-full py-4 bg-indigo-50 dark:bg-indigo-900/40 text-indigo-600 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-100 transition-all flex items-center justify-center gap-2 border border-indigo-100 dark:border-indigo-800"
-                                    >
-                                        <Plus size={14} /> Invite Members
-                                    </button>
-
-                                    {/* Action 3: Team Intel (Chat) */}
-                                    <button 
-                                        onClick={() => setIsChatOpen(!isChatOpen)}
-                                        className={cn(
-                                            "w-full py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 border",
-                                            isChatOpen 
-                                                ? "bg-indigo-600 text-white shadow-lg shadow-indigo-500/20 border-indigo-600" 
-                                                : "bg-indigo-50 dark:bg-indigo-900/40 text-indigo-600 hover:bg-indigo-100 border-indigo-100 dark:border-indigo-800"
-                                        )}
-                                    >
-                                        <MessageSquare size={14} /> {isChatOpen ? 'Close Intel' : 'Team Intel'}
-                                    </button>
                                 </div>
 
                             {/* Team Messenger Section */}

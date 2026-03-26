@@ -151,35 +151,35 @@ const TeamInviteModal = () => {
                         onClick={() => closeModal('teamInvite')}
                     />
 
-                    {false ? (
+                    {(userRole === 'public') ? (
                         <motion.div
                             initial={{ opacity: 0, scale: 0.95 }}
                             animate={{ opacity: 1, scale: 1 }}
                             exit={{ opacity: 0, scale: 0.95 }}
                             className="relative w-full max-w-sm bg-white dark:bg-slate-900 rounded-[2.5rem] p-8 text-center shadow-2xl border border-slate-100 dark:border-slate-800"
                         >
-                            <div className="w-16 h-16 bg-indigo-50 dark:bg-indigo-900/30 rounded-2xl flex items-center justify-center text-indigo-600 mx-auto mb-6">
-                                <Users size={32} />
+                            <div className="w-16 h-16 bg-amber-50 dark:bg-amber-900/30 rounded-2xl flex items-center justify-center text-amber-600 mx-auto mb-6">
+                                <Crown size={32} />
                             </div>
-                            <h3 className="text-xl font-black text-slate-900 dark:text-white mb-2 uppercase tracking-tighter">Team Edition Required</h3>
-                            <p className="text-sm font-bold text-slate-500 mb-8 px-4">You need a subscription to START your own team and invite members.</p>
+                            <h3 className="text-xl font-black text-slate-900 dark:text-white mb-2 uppercase tracking-tighter">Premium Access Required</h3>
+                            <p className="text-sm font-bold text-slate-500 mb-8 px-4">You need a Team Edition subscription to HOST a team and invite others to your workspace.</p>
                             
                             <div className="space-y-3">
                                 <button 
-                                    onClick={() => {
-                                        closeModal('teamInvite');
-                                        const id = window.prompt("Enter your Team Leader's UID to join:");
-                                        if (id) navigate(`/invite/${id}`);
-                                    }}
+                                    onClick={() => { closeModal('teamInvite'); openModal('payment'); }} 
                                     className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-indigo-600/20 hover:bg-indigo-700 transition-all"
                                 >
-                                    Join Existing Team
+                                    Get Team Edition
                                 </button>
                                 <button 
-                                    onClick={() => { closeModal('teamInvite'); useAppStore.getState().openModal('payment'); }} 
+                                    onClick={() => {
+                                        closeModal('teamInvite');
+                                        const id = window.prompt("Enter Team ID/Code to join:");
+                                        if (id) navigate(`/invite/${id}`);
+                                    }}
                                     className="w-full py-4 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-200 transition-all"
                                 >
-                                    Upgrade Channel
+                                    Join Existing Team
                                 </button>
                             </div>
                         </motion.div>
@@ -202,33 +202,44 @@ const TeamInviteModal = () => {
                             </div>
 
                             <div className="space-y-8">
-                                {/* Direct Add Form */}
-                                <div className="bg-slate-50 dark:bg-slate-800/50 rounded-3xl p-6 border border-slate-100 dark:border-slate-800">
-                                    <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-4 flex items-center gap-2">
-                                        <Plus size={14} /> Personnel Induction
-                                    </h3>
-                                    <form onSubmit={handleAddMember} className="flex gap-2">
-                                        <input 
-                                            type="email" 
-                                            placeholder="Enter user email address..." 
-                                            value={memberEmail}
-                                            onChange={(e) => setMemberEmail(e.target.value)}
-                                            className="flex-1 px-5 py-3 bg-white dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 rounded-2xl text-[10px] font-bold outline-none focus:border-indigo-600 transition-all placeholder:text-slate-300"
-                                        />
-                                        <button 
-                                            type="submit" 
-                                            disabled={isAdding || !memberEmail}
-                                            className="px-6 bg-indigo-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:scale-105 active:scale-95 transition-all disabled:opacity-50 shadow-lg shadow-indigo-600/20"
-                                        >
-                                            {isAdding ? <Loader2 size={16} className="animate-spin" /> : 'Induct Unit'}
-                                        </button>
-                                    </form>
-                                    {addStatus.msg && (
-                                        <p className={`text-[10px] font-bold mt-2 px-2 ${addStatus.type === 'success' ? 'text-emerald-500' : 'text-rose-500'}`}>
-                                            {addStatus.msg}
+                                {/* Direct Add Form (Only for Admins/Managers due to security rules) */}
+                                {(userRole === 'admin' || userRole === 'event_manager') ? (
+                                    <div className="bg-slate-50 dark:bg-slate-800/50 rounded-3xl p-6 border border-slate-100 dark:border-slate-800">
+                                        <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-4 flex items-center gap-2">
+                                            <Plus size={14} /> Personnel Induction (Admin Only)
+                                        </h3>
+                                        <form onSubmit={handleAddMember} className="flex gap-2">
+                                            <input 
+                                                type="email" 
+                                                placeholder="Enter user email address..." 
+                                                value={memberEmail}
+                                                onChange={(e) => setMemberEmail(e.target.value)}
+                                                className="flex-1 px-5 py-3 bg-white dark:bg-slate-900 border-2 border-slate-100 dark:border-slate-700 rounded-2xl text-[10px] font-bold outline-none focus:border-indigo-600 transition-all placeholder:text-slate-300"
+                                            />
+                                            <button 
+                                                type="submit" 
+                                                disabled={isAdding || !memberEmail}
+                                                className="px-6 bg-indigo-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest hover:scale-105 active:scale-95 transition-all disabled:opacity-50 shadow-lg shadow-indigo-600/20"
+                                            >
+                                                {isAdding ? <Loader2 size={16} className="animate-spin" /> : 'Induct Unit'}
+                                            </button>
+                                        </form>
+                                        {addStatus.msg && (
+                                            <p className={`text-[10px] font-bold mt-2 px-2 ${addStatus.type === 'success' ? 'text-emerald-500' : 'text-rose-500'}`}>
+                                                {addStatus.msg}
+                                            </p>
+                                        )}
+                                    </div>
+                                ) : (
+                                    <div className="bg-indigo-50/50 dark:bg-indigo-900/10 rounded-3xl p-6 border border-indigo-100/50 dark:border-indigo-800/50">
+                                        <h3 className="text-[10px] font-black uppercase tracking-widest text-indigo-600 dark:text-indigo-400 mb-2 flex items-center gap-2">
+                                            <Sparkles size={14} /> How to add members
+                                        </h3>
+                                        <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400 leading-relaxed">
+                                            To add members to your team, share your <span className="text-indigo-600 dark:text-indigo-400">Unit Frequency link</span> found below. When they click the link, they will be automatically inducted into your Tactical Unit.
                                         </p>
-                                    )}
-                                </div>
+                                    </div>
+                                )}
 
                                 {/* Active Unit Roster */}
                                 <div className="space-y-4">
