@@ -9,6 +9,7 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useAppStore } from '../store';
 import { loginUser, registerUser, initFirebase, getUserData } from '../services/firebase';
+import { initNotificationSystem } from '../notifications';
 import { Shield, Lock, Mail, Loader2, AlertCircle } from 'lucide-react';
 
 const Login = () => {
@@ -64,6 +65,9 @@ const Login = () => {
                 setUserRole(userData.role);
                 setUserProfile(userData);
                 useAppStore.getState().setTeamId(userData.teamId);
+                
+                // Initialize notification system for push alerts
+                initNotificationSystem().catch(err => console.error("Notification Init fail:", err));
 
                 setCloudProvider('firestore');   // Activate cloud sync
             } else {
@@ -76,6 +80,9 @@ const Login = () => {
                 setUserRole(userData.role);
                 setUserProfile(userData);
                 useAppStore.getState().setTeamId(userData.teamId);
+
+                // Initialize notification system for push alerts
+                initNotificationSystem().catch(err => console.error("Notification Init fail:", err));
 
                 setCloudProvider('firestore');   // Activate cloud sync
             }

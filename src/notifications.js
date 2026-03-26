@@ -1,5 +1,7 @@
-// Notification System with Web Notifications API
 import { useAppStore } from './store';
+import { requestFCMToken, auth } from './services/firebase';
+import { onMessage } from 'firebase/messaging';
+import { messaging } from './services/firebase';
 
 // Request notification permission
 export const requestNotificationPermission = async () => {
@@ -124,7 +126,23 @@ export const initNotificationSystem = async () => {
     const hasPermission = await requestNotificationPermission();
 
     if (hasPermission) {
-        // Check notifications every hour
+        // Foreground Message Handler (When tab is active)
+        if (messaging) {
+            onMessage(messaging, (payload) => {
+                console.log("🔔 Foreground Message received:", payload);
+                showNotification(payload.notification.title, {
+                    body: payload.notification.body,
+                    ...payload.notification
+                });
+            });
+        }
+
+        // Register for Push Tokens if logged in
+        if (auth?.currentUser) {
+            await requestFCMToken(auth.currentUser.uid);
+        }
+
+        // Check local reminders every hour
         setInterval(() => {
             import('./db').then(({ getAllEvents }) => {
                 getAllEvents().then(events => {

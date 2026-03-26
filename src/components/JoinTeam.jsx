@@ -2,12 +2,12 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAppStore } from '../store';
-import { doc, updateDoc, getDoc } from 'firebase/firestore';
-import { db, auth } from '../services/firebase';
-import { ShieldCheck, Users, Loader2, ArrowRight } from 'lucide-react';
+import { doc, updateDoc, getDoc, query, collection, where, getDocs } from 'firebase/firestore';
+import { db, auth, getTeamMembers } from '../services/firebase';
+import { ShieldCheck, Users, Loader2, ArrowRight, LogIn, AlertTriangle } from 'lucide-react';
 
 const JoinTeam = () => {
-    const { teamId } = useParams();
+    const { teamId } = useParams(); // This can be a UID or an Invite Code
     const navigate = useNavigate();
 
     const user = useAppStore((state) => state.user);
@@ -15,73 +15,95 @@ const JoinTeam = () => {
     const setUserRole = useAppStore((state) => state.setUserRole);
     const setTeamId = useAppStore((state) => state.setTeamId);
 
-    const [status, setStatus] = useState('idle'); // idle, loading, success, error
+    const [status, setStatus] = useState('loading'); // idle, loading, success, error
     const [errorMsg, setErrorMsg] = useState('');
     const [resolvedTeamId, setResolvedTeamId] = useState(null);
-    const [teamName, setTeamName] = useState('Team Workspace');
+    const [teamName, setTeamName] = useState('Tactical Workspace');
+    const [teamSize, setTeamSize] = useState(0);
 
     useEffect(() => {
         const resolveAndFetch = async () => {
-            if (!db || !teamId) return;
+            if (!db || !teamId) {
+                // Wait for DB or handle missing ID
+                if (!teamId) {
+                    setErrorMsg("Mission Critical: Team Identifier missing.");
+                    setStatus('error');
+                }
+                return;
+            }
+
             setStatus('loading');
             try {
-                // 1. Try to fetch as direct UID
-                let leaderDoc = await getDoc(doc(db, 'users', teamId));
-                
-                // 2. If not a UID, try searching as an Invite Code
-                if (!leaderDoc.exists()) {
-                    const { query, collection, where, getDocs } = await import('firebase/firestore');
+                let leaderSnap = null;
+                let leaderUid = null;
+
+                // 1. Attempt Direct UID Resolution
+                try {
+                    const directSnap = await getDoc(doc(db, 'users', teamId));
+                    if (directSnap.exists()) {
+                        leaderSnap = directSnap;
+                        leaderUid = directSnap.id;
+                    }
+                } catch (e) { /* ignore cast errors for invite codes */ }
+
+                // 2. Attempt Invite Code Resolution (if UID failed)
+                if (!leaderSnap) {
                     const q = query(collection(db, 'users'), where('inviteCode', '==', teamId.toUpperCase()));
                     const querySnapshot = await getDocs(q);
-                    
                     if (!querySnapshot.empty) {
-                        leaderDoc = querySnapshot.docs[0];
+                        leaderSnap = querySnapshot.docs[0];
+                        leaderUid = leaderSnap.id;
                     }
                 }
 
-                if (leaderDoc.exists()) {
-                    setTeamName(`${leaderDoc.data().displayName || 'Leader'}'s Team`);
-                    setResolvedTeamId(leaderDoc.id);
-                    setStatus('idle');
+                if (leaderSnap && leaderUid) {
+                    const data = leaderSnap.data();
+                    setTeamName(`${data.displayName || 'Leader'}'s Tactical Unit`);
+                    setResolvedTeamId(leaderUid);
+
+                    // 3. Check Team Capacity (10 members limit)
+                    const members = await getTeamMembers(leaderUid);
+                    setTeamSize(members.length);
+                    
+                    if (members.length >= 10) {
+                        setErrorMsg("Tactical Alert: This unit is at maximum capacity (10/10).");
+                        setStatus('error');
+                    } else {
+                        setStatus('idle');
+                    }
                 } else {
-                    setErrorMsg("Invalid Team ID or Invite Code. Please check and try again.");
+                    setErrorMsg("Invalid Intel: Team ID or Code not found in the tactical network.");
                     setStatus('error');
                 }
             } catch (err) {
                 console.error("Resolution failed", err);
-                setErrorMsg("Failed to connect to the tactical network.");
+                setErrorMsg("Communication Failure: Could not sync with the tactical network.");
                 setStatus('error');
             }
         };
+
         resolveAndFetch();
-    }, [teamId]);
+    }, [teamId, db]);
 
     const handleJoinTeam = async () => {
         if (!user) {
-            setErrorMsg("Please log in or register first before joining a team.");
+            navigate('/'); // Fallback to login
+            return;
+        }
+
+        if (!resolvedTeamId) return;
+
+        // Prevent joining own team redundant cycle
+        if (resolvedTeamId === user.uid) {
+            setErrorMsg("Operational Paradox: You are already the leader of this workspace.");
             setStatus('error');
             return;
         }
 
-        // Public users ARE allowed to join teams (they become 'member')
-        // if (userRole === 'public') { ... removed this barrier ... }
-
-        // Removed strictly blocking subscribers. They can join others, but their role becomes 'member'.
-        /* if (userRole === 'subscriber' || userRole === 'team_leader' || userRole === 'admin') {
-            setErrorMsg("You are already a Team Leader or Admin. You cannot join another team. You must first downgrade your role to 'public' to join a different team.");
-            setStatus('error');
-            return;
-        } */
-
-        if (!resolvedTeamId) {
-            setErrorMsg("Could not verify team. Please try again.");
-            setStatus('error');
-            return;
-        }
-
+        // Prevent joining if already in someone else's team
         const { teamId: currentTeamId } = useAppStore.getState();
         if (currentTeamId && currentTeamId !== user.uid && currentTeamId !== resolvedTeamId) {
-            setErrorMsg("You are already in another team. Please leave your current team before joining this one.");
+            setErrorMsg("Deployment Lock: You are currently active in another team. Exit that unit first.");
             setStatus('error');
             return;
         }
@@ -90,82 +112,118 @@ const JoinTeam = () => {
         try {
             if (db && auth?.currentUser) {
                 const userRef = doc(db, 'users', auth.currentUser.uid);
+                
+                // Determine target role (Preserve premium status if they have it)
+                const targetRole = (userRole === 'subscriber' || userRole === 'admin' || userRole === 'event_manager') 
+                    ? userRole 
+                    : 'member';
+
                 await updateDoc(userRef, {
-                    role: 'member',
+                    role: targetRole,
                     teamId: resolvedTeamId
                 });
 
-                // Update local role and team
-                setUserRole('member');
+                // Synchronize Intelligence (Local Store)
+                setUserRole(targetRole);
                 setTeamId(resolvedTeamId);
                 setStatus('success');
 
-                setTimeout(() => {
-                    navigate('/');
-                }, 2000);
+                // Mission Success Redirect
+                setTimeout(() => navigate('/'), 2000);
             } else {
-                throw new Error("Database not initialized");
+                throw new Error("Encryption Error: Authorization failed.");
             }
         } catch (error) {
             console.error(error);
-            setErrorMsg(error.message || "Failed to join team.");
+            setErrorMsg(error.message || "Operation Failed: Could not induct into unit.");
             setStatus('error');
         }
     };
 
     return (
-        <div className="min-h-[80vh] flex flex-col justify-center items-center p-6">
+        <div className="min-h-[90vh] flex flex-col justify-center items-center p-6 bg-slate-50 dark:bg-slate-950">
             <motion.div
-                initial={{ opacity: 0, y: 20, scale: 0.95 }}
+                initial={{ opacity: 0, y: 30, scale: 0.95 }}
                 animate={{ opacity: 1, y: 0, scale: 1 }}
-                className="w-full max-w-md bg-white dark:bg-slate-900 rounded-[2.5rem] shadow-2xl p-10 text-center border border-slate-100 dark:border-slate-800"
+                className="w-full max-w-md bg-white dark:bg-slate-900 rounded-[3rem] shadow-2xl p-10 text-center border border-slate-100 dark:border-slate-800 relative overflow-hidden"
             >
-                <div className="w-20 h-20 bg-indigo-50 dark:bg-indigo-900/30 rounded-3xl flex items-center justify-center text-indigo-600 mx-auto mb-6">
-                    <Users size={40} />
+                {/* Decorative Elements */}
+                <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/5 blur-3xl rounded-full translate-x-10 -translate-y-10" />
+                <div className="absolute bottom-0 left-0 w-32 h-32 bg-indigo-500/5 blur-3xl rounded-full -translate-x-10 translate-y-10" />
+
+                <div className="w-24 h-24 bg-indigo-50 dark:bg-indigo-900/30 rounded-[2rem] flex items-center justify-center text-indigo-600 mx-auto mb-8 shadow-inner">
+                    {status === 'error' ? <AlertTriangle size={48} className="text-rose-500" /> : <Users size={48} />}
                 </div>
 
-                <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tight mb-2">Join {teamName}</h1>
-                <p className="text-sm font-bold text-slate-500 mb-8 max-w-xs mx-auto">
-                    You've been invited to collaborate in a Team Edition workspace.
-                </p>
+                <h1 className="text-3xl font-black text-slate-900 dark:text-white tracking-tighter mb-2 uppercase italic leading-none">
+                    Unit <span className="text-indigo-600">induction</span>
+                </h1>
+                <p className="text-[10px] font-black text-slate-400 mb-8 uppercase tracking-[0.3em]">Sector: {teamName}</p>
 
-                {status === 'success' ? (
-                    <motion.div
-                        initial={{ opacity: 0, scale: 0.8 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        className="bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 p-6 rounded-2xl flex flex-col items-center"
-                    >
-                        <ShieldCheck size={32} className="mb-3" />
-                        <p className="font-black uppercase tracking-widest text-xs">Successfully Joined!</p>
-                        <p className="text-[10px] opacity-70 mt-1">Redirecting to dashboard...</p>
-                    </motion.div>
-                ) : status === 'error' ? (
-                    <div className="bg-rose-50 dark:bg-rose-900/30 text-rose-600 p-6 rounded-2xl mb-6 text-sm font-bold border border-rose-100 dark:border-rose-900/50">
-                        {errorMsg}
-                    </div>
-                ) : null}
-
-                {status !== 'success' && (
-                    <div className="space-y-4">
-                        <button
-                            onClick={handleJoinTeam}
-                            disabled={status === 'loading'}
-                            className="w-full h-14 bg-indigo-600 text-white rounded-2xl font-black uppercase tracking-widest text-[11px] flex items-center justify-center gap-3 shadow-xl shadow-indigo-500/30 hover:bg-indigo-700 active:scale-[0.98] transition-all disabled:opacity-70 disabled:active:scale-100"
+                <div className="space-y-6 relative z-10">
+                    {status === 'loading' ? (
+                        <div className="flex flex-col items-center gap-4 py-8">
+                            <Loader2 size={32} className="animate-spin text-indigo-600" />
+                            <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Decrypting Frequency...</p>
+                        </div>
+                    ) : status === 'success' ? (
+                        <motion.div
+                            initial={{ opacity: 0, scale: 0.8 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            className="bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 p-8 rounded-[2rem] border border-emerald-100 dark:border-emerald-800/50 flex flex-col items-center"
                         >
-                            {status === 'loading' ? (
-                                <><Loader2 size={18} className="animate-spin" /> Verifying Invitation...</>
-                            ) : (
-                                <>Accept Invitation <ArrowRight size={16} /></>
-                            )}
-                        </button>
+                            <ShieldCheck size={40} className="mb-4" />
+                            <p className="font-black uppercase tracking-[0.2em] text-xs">Induction Successful</p>
+                            <p className="text-[10px] font-bold opacity-60 mt-2">Deploying to Command Center...</p>
+                        </motion.div>
+                    ) : status === 'error' ? (
+                        <div className="space-y-6">
+                            <div className="bg-rose-50 dark:bg-rose-900/20 text-rose-600 dark:text-rose-400 p-6 rounded-[2rem] text-[11px] font-black uppercase tracking-widest border border-rose-100 dark:border-rose-800/50 leading-loose">
+                                {errorMsg}
+                            </div>
+                            <button 
+                                onClick={() => navigate('/')}
+                                className="w-full py-4 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-slate-200 transition-all border border-slate-200 dark:border-slate-700"
+                            >
+                                Abort Mission
+                            </button>
+                        </div>
+                    ) : (
+                        <div className="space-y-6">
+                            <div className="bg-indigo-50/50 dark:bg-indigo-900/10 p-6 rounded-[2rem] border border-indigo-100/50 dark:border-indigo-800/50">
+                                <div className="flex justify-between items-center mb-2">
+                                    <p className="text-[10px] font-black text-slate-500 uppercase">Unit Strength</p>
+                                    <p className="text-[10px] font-black text-indigo-600 uppercase italic">{teamSize} / 10 Active</p>
+                                </div>
+                                <div className="w-full h-1 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
+                                    <div className="h-full bg-indigo-600 transition-all" style={{ width: `${(teamSize/10)*100}%` }} />
+                                </div>
+                            </div>
 
-                        {!user && (
-                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">
-                                Or <span className="text-indigo-600 cursor-pointer hover:underline" onClick={() => navigate('/')}>Login First</span>
-                            </p>
-                        )}
-                    </div>
-                )}
+                            {!user ? (
+                                <div className="space-y-4">
+                                    <p className="text-[11px] font-bold text-slate-500 leading-relaxed">
+                                        You must establish a secure connection (Login) before you can be inducted into this Tactical Unit.
+                                    </p>
+                                    <button
+                                        onClick={() => navigate('/')}
+                                        className="w-full h-16 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-[1.5rem] font-black uppercase tracking-[0.2em] text-[11px] flex items-center justify-center gap-3 shadow-2xl hover:scale-105 active:scale-95 transition-all"
+                                    >
+                                        <LogIn size={20} /> Establish Connection
+                                    </button>
+                                </div>
+                            ) : (
+                                <button
+                                    onClick={handleJoinTeam}
+                                    className="w-full h-20 bg-indigo-600 text-white rounded-[2rem] font-black uppercase tracking-[0.3em] text-[11px] flex flex-col items-center justify-center gap-1 shadow-2xl shadow-indigo-500/40 hover:bg-indigo-700 hover:scale-[1.02] active:scale-[0.98] transition-all group"
+                                >
+                                    <span className="flex items-center gap-2">Accept Command <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" /></span>
+                                    <span className="text-[9px] opacity-60 normal-case tracking-normal font-bold font-sans italic">Induct as Unit Member</span>
+                                </button>
+                            )}
+                        </div>
+                    )}
+                </div>
             </motion.div>
         </div>
     );

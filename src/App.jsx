@@ -285,61 +285,71 @@ function App() {
         return () => clearInterval(interval);
     }, []);
 
-    // Check if current URL is an invite link (for unauthenticated users)
-    const isInviteUrl = window.location.pathname.startsWith('/invite/');
-
     return (
         <ErrorBoundary>
             {/* Splash Screen (High Z-Index) */}
             {showSplash && <SplashScreen onComplete={() => setShowSplash(false)} />}
 
             {/* Main Application Content */}
-            {/* We render the main app only when NOT loading, but we keep Splash on top until it completes */}
             <div className={cn("contents", isLoading && "hidden")}>
                 <Router>
-                    {user ? (
-                        <div className="min-h-screen bg-gray-50 dark:bg-[#0f172a] transition-colors duration-500 pb-24 lg:pb-0">
-                            {/* Fixed Header */}
-                            <div className="sticky top-0 z-[60]">
-                                <Header />
-                            </div>
-
-                            {/* Mobile Bottom Navigation */}
-                            <BottomNav />
-
-                            {/* Shared Modals */}
-                            <Suspense fallback={null}>
-                                <AddEventModal />
-                                <ImportCSVModal />
-                                <EventDetailsModal />
-                                <EditEventModal />
-                                <PaymentModal />
-                                <TeamInviteModal />
-                                <ProfileModal />
-                                <FeedbackModal />
-                                <LegalModal />
-                            </Suspense>
-
-                            {/* Main Content Area */}
-                            <main className="container mx-auto px-3 sm:px-4 py-4 sm:py-6 max-w-7xl">
-                                <AnimatedRoutes user={user} />
-                            </main>
-                        </div>
-                    ) : (
-                        /* When not logged in: show JoinTeam for invite URLs, Login for everything else */
-                        isInviteUrl ? (
-                            <div className="min-h-screen bg-gray-50 dark:bg-[#0f172a] transition-colors duration-500">
-                                <main className="container mx-auto px-3 sm:px-4 py-4 sm:py-6 max-w-7xl">
-                                    <AnimatedRoutes user={null} />
-                                </main>
-                            </div>
-                        ) : (
-                            !isLoading && <Login />
-                        )
-                    )}
+                    <RoutesWrapper 
+                        user={user} 
+                        isLoading={isLoading}
+                    />
                 </Router>
             </div>
         </ErrorBoundary>
+    );
+}
+
+/**
+ * 🛰️ ROUTES WRAPPER
+ * This component is inside the Router and can use useLocation.
+ */
+function RoutesWrapper({ user, isLoading }) {
+    const location = useLocation();
+    const isInviteUrl = location.pathname.startsWith('/invite/');
+
+    if (isLoading) return null;
+
+    if (!user) {
+        return (
+            <AnimatePresence mode="wait">
+                <Routes location={location} key={location.pathname}>
+                    <Route path="/invite/:teamId" element={<Suspense fallback={null}><JoinTeam /></Suspense>} />
+                    <Route path="*" element={<Login />} />
+                </Routes>
+            </AnimatePresence>
+        );
+    }
+
+    return (
+        <div className="min-h-screen bg-gray-50 dark:bg-[#0f172a] transition-colors duration-500 pb-24 lg:pb-0">
+            <div className="sticky top-0 z-[60]">
+                <Header />
+            </div>
+
+            <BottomNav />
+
+            {/* Shared Modals */}
+            <Suspense fallback={null}>
+                <AddEventModal />
+                <ImportCSVModal />
+                <EventDetailsModal />
+                <EditEventModal />
+                <PaymentModal />
+                <TeamInviteModal />
+                <ProfileModal />
+                <FeedbackModal />
+                <LegalModal />
+                <AdminPanel />
+            </Suspense>
+
+            <main className="container mx-auto px-3 sm:px-4 py-4 sm:py-6 max-w-7xl">
+                <AnimatedRoutes user={user} />
+            </main>
+        </div>
     );
 }
 

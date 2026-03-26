@@ -24,6 +24,11 @@ import {
     where
 } from "firebase/firestore";
 import {
+    getMessaging,
+    getToken,
+    onMessage
+} from "firebase/messaging";
+import {
     getAuth,
     signInWithEmailAndPassword,
     createUserWithEmailAndPassword,
@@ -36,6 +41,7 @@ import {
 export let db = null;   // Firestore instance
 export let auth = null; // Auth instance
 export let app = null;  // Firebase App instance
+export let messaging = null; // Messaging instance
 
 /**
  * Initializes Firebase with user-provided configuration.
@@ -51,11 +57,61 @@ export const initFirebase = (config) => {
             app = initializeApp(config);
             db = getFirestore(app);
             auth = getAuth(app);
+            
+            // Background notifications require Messaging initialization
+            try {
+                messaging = getMessaging(app);
+                console.log("🔔 Messaging Engine ready for Push Protocol.");
+            } catch (err) {
+                console.log("⚠️ Messaging initialization skipped (likely local dev or unsupported browser)");
+            }
+
             console.log("✅ Firebase Engine ignited successfully.");
         }
-        return { db, auth };
+        return { db, auth, messaging };
     } catch (error) {
         console.error("❌ Firebase Init Error:", error);
+        return null;
+    }
+};
+
+/**
+ * MESSAGING: Requests a token for the current device and saves it to user profile.
+ */
+export const requestFCMToken = async (uid) => {
+    if (!messaging || !db) return null;
+
+    try {
+        // VAPID Key from Firebase Console -> Settings -> Cloud Messaging -> Web Push certificates
+        // User will need to provide this for background notifications when app is closed.
+        const token = await getToken(messaging, {
+            // NOTE: Public VAPID key would go here. For now it uses default if already configured in project.
+            // vapidKey: 'YOUR_VAPID_KEY' 
+        });
+
+        if (token) {
+            console.log("📍 FCM Token received:", token);
+            // Store token in user's profile to target them later
+            const userRef = doc(db, "users", uid);
+            const userSnap = await getDoc(userRef);
+            
+            if (userSnap.exists()) {
+                const data = userSnap.data();
+                const tokens = data.fcmTokens || [];
+                if (!tokens.includes(token)) {
+                    await updateDoc(userRef, {
+                        fcmTokens: [...tokens, token],
+                        lastTokenSync: new Date().toISOString()
+                    });
+                }
+            }
+            return token;
+        } else {
+            console.warn("❌ No FCM registration token available. Request permission to generate one.");
+            return null;
+        }
+    } catch (error) {
+        console.error("❌ Error retrieving FCM token:", error);
         return null;
     }
 };

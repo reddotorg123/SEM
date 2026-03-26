@@ -456,6 +456,27 @@ const Settings = () => {
                             <div className="w-12 h-6 bg-slate-200 dark:bg-slate-700 rounded-full peer peer-checked:bg-indigo-600 transition-all after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-6" />
                         </label>
                     </div>
+
+                    <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 flex flex-col md:flex-row items-center justify-between gap-4">
+                        <div className="flex items-center gap-3">
+                            <Smartphone size={18} className="text-slate-400" />
+                            <div>
+                                <p className="text-xs font-black text-slate-700 dark:text-slate-300 uppercase tracking-widest">Device Registration</p>
+                                <p className="text-[10px] text-slate-500 font-bold uppercase">Required for instant background alerts</p>
+                            </div>
+                        </div>
+                        <button 
+                            onClick={async () => {
+                                const { initNotificationSystem } = await import('../notifications');
+                                const granted = await initNotificationSystem();
+                                if (granted) alert("✅ Success: This device is now registered for Intelligence Intel (Push Notifications).");
+                                else alert("❌ Error: Notification permission denied or device unsupported.");
+                            }}
+                            className="w-full md:w-auto px-6 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-600 rounded-lg text-[10px] font-black uppercase tracking-widest border border-indigo-100 transition-all"
+                        >
+                            Register Device for Push
+                        </button>
+                    </div>
                 </div>
             </SettingSection>
 
