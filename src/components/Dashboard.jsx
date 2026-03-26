@@ -594,14 +594,25 @@ const Dashboard = () => {
                                     ) : (
                                         /* Public User View: Join Input */
                                         <div className="bg-slate-50 dark:bg-slate-800/50 rounded-2xl p-4 border border-slate-100 dark:border-slate-800">
-                                            <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
-                                                <Users size={12} /> External Unit Joining
-                                            </h4>
+                                            <div className="flex items-center justify-between mb-3">
+                                                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                                                    <Users size={12} /> Join a Tactical Unit
+                                                </h4>
+                                                <button 
+                                                    onClick={() => {
+                                                        const id = window.prompt("Enter Team ID/Code to join:");
+                                                        if (id) navigate(`/invite/${id}`);
+                                                    }}
+                                                    className="text-[8px] font-black text-indigo-600 uppercase tracking-widest hover:underline"
+                                                >
+                                                    Manual Join
+                                                </button>
+                                            </div>
                                             <div className="flex gap-2">
                                                 <input 
                                                     id="join-team-input"
                                                     type="text" 
-                                                    placeholder="Enter Team ID or Invite Code..."
+                                                    placeholder="Invite Code (e.g. AB12XY78)..."
                                                     className="flex-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl px-4 py-3 text-[10px] font-bold outline-none focus:ring-2 focus:ring-indigo-600 transition-all"
                                                     onKeyDown={(e) => {
                                                         if (e.key === 'Enter') {
@@ -615,13 +626,13 @@ const Dashboard = () => {
                                                         const val = document.getElementById('join-team-input').value.trim();
                                                         if (val) navigate(`/invite/${val}`);
                                                     }}
-                                                    className="px-4 bg-indigo-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:scale-105 active:scale-95 transition-all shadow-lg shadow-indigo-600/20"
+                                                    className="px-4 bg-indigo-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-black transition-all shadow-lg shadow-indigo-600/20"
                                                 >
-                                                    Infil
+                                                    Join Team
                                                 </button>
                                             </div>
                                             <p className="text-[9px] font-bold text-slate-400 mt-3 flex items-center gap-1">
-                                                <Sparkles size={10} className="text-amber-500" /> Enter a leader's UID or custom Invite Code.
+                                                <Sparkles size={10} className="text-amber-500" /> Enter a leader's UID or the custom Invite Code they shared with you.
                                             </p>
                                         </div>
                                     )}

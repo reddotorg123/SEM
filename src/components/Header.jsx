@@ -176,6 +176,22 @@ const Header = () => {
                                             <SettingsIcon size={16} className="text-slate-400" /> Account Settings
                                         </Link>
 
+                                        {(userRole === 'subscriber' || userRole === 'team_leader' || userRole === 'admin') ? (
+                                            <button
+                                                onClick={() => { setIsProfileOpen(false); openModal('teamInvite'); }}
+                                                className="w-full text-left px-4 py-3 text-xs font-bold hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 transition-colors flex items-center gap-3"
+                                            >
+                                                <Users size={16} className="text-indigo-500" /> Manage Tactical Unit
+                                            </button>
+                                        ) : (
+                                            <button
+                                                onClick={() => { setIsProfileOpen(false); navigate('/'); /* User can use the join input on dashboard */ }}
+                                                className="w-full text-left px-4 py-3 text-xs font-bold hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 transition-colors flex items-center gap-3"
+                                            >
+                                                <Users size={16} className="text-indigo-500" /> Join Tactical Team
+                                            </button>
+                                        )}
+
                                         {(userRole === 'public') ? (
                                             <button
                                                 onClick={() => { setIsProfileOpen(false); openModal('payment'); }}
