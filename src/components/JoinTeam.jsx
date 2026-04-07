@@ -86,7 +86,6 @@ const JoinTeam = () => {
     const handleJoinTeam = async () => {
         if (!user) {
             sessionStorage.setItem('pendingInvite', teamId);
-            useAppStore.getState().openModal('login'); // Trigger login modal if not logged in
             navigate('/');
             return;
         }
@@ -94,15 +93,15 @@ const JoinTeam = () => {
         if (!resolvedTeamId) return;
 
         if (resolvedTeamId === user.uid) {
-            setErrorMsg("Deployment Error: You are already the leader of your own unit. You cannot join yourself.");
+            setErrorMsg("Operational Paradox: You are already the leader.");
             setStatus('error');
             return;
         }
 
-        const currentTeamId = useAppStore.getState().teamId;
-        if (currentTeamId === resolvedTeamId) {
-            setStatus('success');
-            setTimeout(() => navigate('/'), 1500);
+        const { teamId: currentTeamId } = useAppStore.getState();
+        if (currentTeamId && currentTeamId !== user.uid && currentTeamId !== resolvedTeamId) {
+            setErrorMsg("Deployment Lock: You are active in another team.");
+            setStatus('error');
             return;
         }
 
@@ -110,35 +109,28 @@ const JoinTeam = () => {
         try {
             if (db && auth?.currentUser) {
                 const userRef = doc(db, 'users', auth.currentUser.uid);
-                
-                // Keep existing elevated roles, otherwise default to 'member'
                 const targetRole = (userRole === 'subscriber' || userRole === 'admin' || userRole === 'event_manager') 
                     ? userRole 
                     : 'member';
 
                 await updateDoc(userRef, {
                     role: targetRole,
-                    teamId: resolvedTeamId,
-                    lastInduction: new Date().toISOString()
+                    teamId: resolvedTeamId
                 });
 
-                // Immediate local state update for responsiveness
                 setUserRole(targetRole);
                 setTeamId(resolvedTeamId);
                 setStatus('success');
 
-                console.log(`[JoinTeam] Successfully inducted into ${resolvedTeamId}`);
                 setTimeout(() => navigate('/'), 2000);
             } else {
-                throw new Error("Authorization failed. Ensure you are signed in.");
+                throw new Error("Authorization failed.");
             }
         } catch (error) {
-            console.error("[JoinTeam] Critical induction failure:", error);
-            setErrorMsg(error.message || "Sector Communication Error. Try again.");
+            setErrorMsg(error.message || "Operation Failed.");
             setStatus('error');
         }
     };
-
 
     return (
         <div className="min-h-[90vh] flex flex-col justify-center items-center p-6 bg-slate-50 dark:bg-slate-950">

@@ -70,9 +70,9 @@ const MANUAL_STATUSES = [
     EventStatus.BLOCKED, 
     EventStatus.REGISTERED, 
     EventStatus.SHORTLISTED,
-    EventStatus.UPCOMING
+    EventStatus.UPCOMING,
+    EventStatus.OPEN
 ];
-
 
 /**
  * Creates a standard event object with defaults.

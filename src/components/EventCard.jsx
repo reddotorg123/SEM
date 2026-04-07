@@ -37,7 +37,7 @@ const PosterImage = ({ event }) => {
 
     React.useEffect(() => {
         let objectUrl = null;
-        setHasError(false);
+        setHasError(false); // Reset error state on new event/url
 
         if (event.posterBlob instanceof Blob) {
             objectUrl = URL.createObjectURL(event.posterBlob);
@@ -47,15 +47,15 @@ const PosterImage = ({ event }) => {
         } else if (event.posterUrl) {
             setImgSrc(resolveImageUrl(event.posterUrl));
         } else {
-            // Use the high-quality category-based fallback instead of null
-            setImgSrc(getDefaultPoster(event.eventType));
+            setImgSrc(null);
         }
 
         return () => {
-            if (objectUrl) URL.revokeObjectURL(objectUrl);
+            if (objectUrl) {
+                URL.revokeObjectURL(objectUrl);
+            }
         };
-    }, [event.posterBlob, event.posterUrl, event.eventType]);
-
+    }, [event.posterBlob, event.posterUrl]);
 
     if (!imgSrc || hasError) {
         return (
