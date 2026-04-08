@@ -54,9 +54,10 @@ const TeamInviteModal = () => {
                 });
 
                 // Real-time subscribe to join requests
-                const { subscribeToTeamRequests } = require('../services/firebase');
-                const unsubscribe = subscribeToTeamRequests(ownerId, setJoinRequests);
-                return () => unsubscribe && unsubscribe();
+                import('../services/firebase').then(({ subscribeToTeamRequests }) => {
+                    const unsubscribe = subscribeToTeamRequests(ownerId, setJoinRequests);
+                    return () => unsubscribe && unsubscribe();
+                });
             }
         }
     }, [isOpen, teamId]);

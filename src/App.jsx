@@ -161,34 +161,38 @@ function App() {
         let unsubscribeAuth = () => { };
         let unsubscribeUserData = () => { };
 
+        // Fail-safe: Force stop loading after 10 seconds to prevent stuck splash screen
+        const loadingTimeout = setTimeout(() => {
+            if (isLoading) {
+                console.warn('[System] Loading timeout reached. Force releasing UI.');
+                setIsLoading(false);
+            }
+        }, 10000);
+
         try {
+            console.log('[System] Initializing Firebase Engine...');
             const firebaseData = initFirebase(firebaseConfig);
 
             // Step 2: Listen for User Login / Logout changes
             if (firebaseData?.auth) {
                 unsubscribeAuth = onAuthStateChanged(firebaseData.auth, async (firebaseUser) => {
-                    console.log('[Auth] State changed. User:', firebaseUser?.email || 'None');
-                    setUser(firebaseUser); // Sync user status to the store
-                    unsubscribeUserData(); // clear any previous listener
+                    console.log('[Auth] State resolved. User:', firebaseUser?.email || 'None');
+                    clearTimeout(loadingTimeout); // Auth resolved, we can clear the timeout
+                    setUser(firebaseUser);
+                    unsubscribeUserData();
 
                     if (firebaseUser) {
-                        // Cold Start: Use UID as teamId immediately to avoid global data collision before profile loads
-                        const currentTeamId = useAppStore.getState().teamId;
-                        if (!currentTeamId) {
-                            useAppStore.getState().setTeamId(firebaseUser.uid);
-                        }
-
                         try {
                             const { subscribeToUserData } = await import('./services/firebase');
                             unsubscribeUserData = subscribeToUserData(firebaseUser.uid, (userData) => {
                                 useAppStore.getState().setUserRole(userData.role);
-                                useAppStore.getState().setTeamId(userData.teamId); // This will return userData.teamId || uid from the firebase service
+                                useAppStore.getState().setTeamId(userData.teamId);
                                 useAppStore.getState().setUserProfile(userData);
                                 useAppStore.getState().setIsRoleVerified(true);
                                 setIsLoading(false);
                             });
                         } catch (err) {
-                            console.error('[Auth] Failed to fetch user data:', err);
+                            console.error('[Auth] Profile sync failed:', err);
                             useAppStore.getState().setIsRoleVerified(false);
                             setIsLoading(false);
                         }
@@ -198,14 +202,16 @@ function App() {
                     }
                 });
             } else {
+                console.error('[System] Firebase Auth unavailable (Invalid Config).');
                 setIsLoading(false);
             }
         } catch (error) {
-            console.error('[Auth] Initialization crash:', error);
+            console.error('[Auth] Boot crash:', error);
             setIsLoading(false);
         }
 
         return () => {
+            clearTimeout(loadingTimeout);
             unsubscribeAuth();
             unsubscribeUserData();
         };
@@ -268,8 +274,9 @@ function App() {
      */
     useEffect(() => {
         if (!isLoading && user) {
-            const { initNotificationSystem } = require('./notifications');
-            initNotificationSystem();
+            import('./notifications').then(({ initNotificationSystem }) => {
+                initNotificationSystem();
+            }).catch(err => console.error('[Push] System Init Failed:', err));
         }
     }, [isLoading, user, userRole]);
 
@@ -280,7 +287,6 @@ function App() {
     useEffect(() => {
         try {
             updateAllEventStatuses();
-            initNotificationSystem();
         } catch (error) {
             console.error('[System] Maintenance crash:', error);
         }
