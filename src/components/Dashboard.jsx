@@ -89,6 +89,7 @@ const Dashboard = () => {
     const [isChatOpen, setIsChatOpen] = useState(false);
     const [editingMember, setEditingMember] = useState(null); // {id, position}
     const [newPosition, setNewPosition] = useState('');
+    const [teamRequests, setTeamRequests] = useState([]);
     const msgEndRef = useRef(null);
 
     // Fetch Team Members
@@ -97,6 +98,16 @@ const Dashboard = () => {
             const unsubscribeMembers = subscribeToTeamMembers(teamId, (members) => {
                 setTeamMembers(members);
             });
+            
+            // Subscribe to join requests if user is leader
+            let unsubscribeRequests = () => {};
+            if (user?.uid === teamId) {
+                import('../services/firebase').then(({ subscribeToTeamRequests }) => {
+                    unsubscribeRequests = subscribeToTeamRequests(teamId, (reqs) => {
+                        setTeamRequests(reqs);
+                    });
+                });
+            }
             
             // Real-time messages
             const unsubscribeMessages = subscribeToTeamMessages(teamId, (msgs) => {
@@ -571,9 +582,14 @@ const Dashboard = () => {
                                                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                                                     <button 
                                                         onClick={() => openModal('teamInvite')}
-                                                        className="w-full py-4 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-black transition-all flex items-center justify-center gap-2 border border-slate-800"
+                                                        className="relative w-full py-4 bg-slate-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-black transition-all flex items-center justify-center gap-2 border border-slate-800"
                                                     >
                                                         <Crown size={14} className="text-amber-500" /> Manage
+                                                        {teamRequests.length > 0 && (
+                                                            <span className="absolute -top-1 -right-1 w-5 h-5 bg-rose-500 text-white text-[8px] flex items-center justify-center rounded-full border-2 border-white dark:border-slate-900 animate-pulse">
+                                                                {teamRequests.length}
+                                                            </span>
+                                                        )}
                                                     </button>
                                                     <button
                                                         onClick={() => openModal('teamInvite')}

@@ -1,7 +1,8 @@
 import { useAppStore } from './store';
-import { requestFCMToken, auth } from './services/firebase';
+import { requestFCMToken, auth, db } from './services/firebase';
 import { onMessage } from 'firebase/messaging';
 import { messaging } from './services/firebase';
+import { collection, query, orderBy, onSnapshot, where } from 'firebase/firestore';
 
 // Request notification permission
 export const requestNotificationPermission = async () => {
@@ -41,33 +42,9 @@ export const showNotification = (title, options = {}) => {
     }
 };
 
-// Schedule reminder for an event
-export const scheduleEventReminder = (event, daysBeforeDeadline) => {
-    const deadline = new Date(event.registrationDeadline);
-    const reminderDate = new Date(deadline);
-    reminderDate.setDate(reminderDate.getDate() - daysBeforeDeadline);
-
-    const now = new Date();
-    const timeUntilReminder = reminderDate - now;
-
-    if (timeUntilReminder > 0) {
-        setTimeout(() => {
-            showNotification(
-                `Deadline Reminder: ${event.eventName}`,
-                {
-                    body: `Registration deadline in ${daysBeforeDeadline} day(s) - ${event.collegeName}`,
-                    tag: `deadline-${event.id}-${daysBeforeDeadline}`,
-                    requireInteraction: true
-                }
-            );
-        }, timeUntilReminder);
-    }
-};
-
-// Check and send due notifications
+// Check and send due notifications (Local reminders)
 export const checkDueNotifications = async (events) => {
     const { preferences } = useAppStore.getState();
-
     if (!preferences.notificationsEnabled) return;
 
     const now = new Date();
@@ -75,7 +52,6 @@ export const checkDueNotifications = async (events) => {
     const oneWeekFromNow = new Date(today);
     oneWeekFromNow.setDate(oneWeekFromNow.getDate() + 7);
 
-    // Filter events with deadlines in the next 7 days
     const upcomingEvents = events.filter(event => {
         const deadline = new Date(event.registrationDeadline);
         const deadlineDate = new Date(deadline.getFullYear(), deadline.getMonth(), deadline.getDate());
@@ -84,36 +60,29 @@ export const checkDueNotifications = async (events) => {
 
     if (upcomingEvents.length === 0) return;
 
-    // Load shown notifications from localStorage to prevent duplicates
     const shownNotifications = JSON.parse(localStorage.getItem('shown_notifications') || '{}');
     const todayKey = today.toISOString().split('T')[0];
 
-    // Cleanup old entries (older than today)
     if (shownNotifications.date !== todayKey) {
         shownNotifications.date = todayKey;
         shownNotifications.tags = [];
     }
 
-    // Check if we already showed the summary today
     const summaryTag = `summary-${todayKey}`;
     if (shownNotifications.tags.includes(summaryTag)) return;
 
-    // Build the notification body
     let body = 'Upcoming Deadlines:\n';
     upcomingEvents.forEach(event => {
         const dDate = new Date(event.registrationDeadline).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
-        const sDate = new Date(event.startDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
-        body += `• ${event.eventName}: Due ${dDate} | Event ${sDate}\n`;
+        body += `• ${event.eventName}: Due ${dDate}\n`;
     });
 
-    // Show a single aggregated notification
     showNotification(
         `${upcomingEvents.length} Event Deadlines This Week`,
         {
             body: body.trim(),
             tag: summaryTag,
-            requireInteraction: true,
-            data: { type: 'summary', count: upcomingEvents.length }
+            requireInteraction: true
         }
     );
 
@@ -121,15 +90,88 @@ export const checkDueNotifications = async (events) => {
     localStorage.setItem('shown_notifications', JSON.stringify(shownNotifications));
 };
 
+// 🛰️ GLOBAL REAL-TIME MONITORING (For New Events & Payment Requests)
+// This runs regardless of which page the user is on.
+let activeSubscriptions = [];
+
+export const initRealTimeNotifications = () => {
+    if (!db || !auth?.currentUser) return;
+
+    // Clear existing subs
+    activeSubscriptions.forEach(unsub => unsub());
+    activeSubscriptions = [];
+
+    const startTime = new Date().toISOString();
+    const { userRole } = useAppStore.getState();
+
+    // 1. Monitor Global Events (For ALL Users)
+    const eventsQuery = query(collection(db, "events"), orderBy("createdAt", "desc"));
+    const unsubEvents = onSnapshot(eventsQuery, (snapshot) => {
+        snapshot.docChanges().forEach((change) => {
+            if (change.type === "added") {
+                const event = change.doc.data();
+                // Only notify if event is NEW (created after we started the app)
+                if (event.createdAt > startTime) {
+                    showNotification(`🚀 New Event: ${event.eventName}`, {
+                        body: `Added by ${event.collegeName}. Tap to view details.`,
+                        tag: `new-event-${change.doc.id}`
+                    });
+                }
+            }
+        });
+    });
+    activeSubscriptions.push(unsubEvents);
+
+    // 2. Monitor Payment Requests (Only for Admin & Event Manager)
+    if (userRole === 'admin' || userRole === 'event_manager') {
+        const paymentsQuery = query(collection(db, "payment_requests"), orderBy("createdAt", "desc"));
+        const unsubPayments = onSnapshot(paymentsQuery, (snapshot) => {
+            snapshot.docChanges().forEach((change) => {
+                if (change.type === "added") {
+                    const req = change.doc.data();
+                    if (req.createdAt > startTime && req.status === 'pending') {
+                        showNotification(`💳 New Payment Verification: ${req.userName}`, {
+                            body: `Verification requested for ${req.planName}. Action required.`,
+                            tag: `new-payment-${change.doc.id}`,
+                            requireInteraction: true
+                        });
+                    }
+                }
+            });
+        });
+        activeSubscriptions.push(unsubPayments);
+    }
+
+    // 3. Monitor Team Induction Requests (For the current User/Leader)
+    const teamReqQuery = query(
+        collection(db, "team_requests"), 
+        where("teamId", "==", auth.currentUser.uid),
+        where("status", "==", "pending")
+    );
+    const unsubTeamReq = onSnapshot(teamReqQuery, (snapshot) => {
+        snapshot.docChanges().forEach((change) => {
+            if (change.type === "added") {
+                const req = change.doc.data();
+                if (req.createdAt > startTime) {
+                    showNotification(`🔰 New Induction Request`, {
+                        body: `${req.userName} wants to join your Tactical Unit. Approval required.`,
+                        tag: `team-req-${change.doc.id}`,
+                        requireInteraction: true
+                    });
+                }
+            }
+        });
+    });
+    activeSubscriptions.push(unsubTeamReq);
+};
+
 // Initialize notification system
 export const initNotificationSystem = async () => {
     const hasPermission = await requestNotificationPermission();
 
     if (hasPermission) {
-        // Foreground Message Handler (When tab is active)
         if (messaging) {
             onMessage(messaging, (payload) => {
-                console.log("🔔 Foreground Message received:", payload);
                 showNotification(payload.notification.title, {
                     body: payload.notification.body,
                     ...payload.notification
@@ -137,27 +179,19 @@ export const initNotificationSystem = async () => {
             });
         }
 
-        // Register for Push Tokens if logged in
         if (auth?.currentUser) {
             await requestFCMToken(auth.currentUser.uid);
+            initRealTimeNotifications();
         }
 
-        // Check local reminders every hour
+        // Local reminders check
         setInterval(() => {
             import('./db').then(({ getAllEvents }) => {
-                getAllEvents().then(events => {
-                    checkDueNotifications(events);
-                });
+                getAllEvents().then(events => checkDueNotifications(events));
             });
-        }, 60 * 60 * 1000); // 1 hour
-
-        // Check immediately
-        import('./db').then(({ getAllEvents }) => {
-            getAllEvents().then(events => {
-                checkDueNotifications(events);
-            });
-        });
+        }, 60 * 60 * 1000);
     }
 
     return hasPermission;
 };
+

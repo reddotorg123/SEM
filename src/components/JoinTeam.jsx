@@ -100,7 +100,7 @@ const JoinTeam = () => {
 
         const { teamId: currentTeamId } = useAppStore.getState();
         if (currentTeamId && currentTeamId !== user.uid && currentTeamId !== resolvedTeamId) {
-            setErrorMsg("Deployment Lock: You are active in another team.");
+            setErrorMsg("Deployment Lock: You are active in another team. Leave it first.");
             setStatus('error');
             return;
         }
@@ -108,21 +108,13 @@ const JoinTeam = () => {
         setStatus('loading');
         try {
             if (db && auth?.currentUser) {
-                const userRef = doc(db, 'users', auth.currentUser.uid);
-                const targetRole = (userRole === 'subscriber' || userRole === 'admin' || userRole === 'event_manager') 
-                    ? userRole 
-                    : 'member';
-
-                await updateDoc(userRef, {
-                    role: targetRole,
-                    teamId: resolvedTeamId
-                });
-
-                setUserRole(targetRole);
-                setTeamId(resolvedTeamId);
+                const { requestJoinTeam } = await import('../services/firebase');
+                await requestJoinTeam(auth.currentUser.uid, user.displayName || 'Anonymous Unit', resolvedTeamId);
+                
                 setStatus('success');
-
-                setTimeout(() => navigate('/'), 2000);
+                // We keep success state but don't redirect to home immediately? 
+                // Or inform them it's pending.
+                setTimeout(() => navigate('/'), 3000);
             } else {
                 throw new Error("Authorization failed.");
             }
@@ -164,8 +156,8 @@ const JoinTeam = () => {
                             className="bg-emerald-50 dark:bg-emerald-900/20 text-emerald-600 dark:text-emerald-400 p-8 rounded-[2rem] border border-emerald-100 dark:border-emerald-800/50 flex flex-col items-center"
                         >
                             <ShieldCheck size={40} className="mb-4" />
-                            <p className="font-black uppercase tracking-[0.2em] text-xs">Induction Successful</p>
-                            <p className="text-[10px] font-bold opacity-60 mt-2">Deploying to Command Center...</p>
+                            <p className="font-black uppercase tracking-[0.2em] text-xs">Request Transmitted</p>
+                            <p className="text-[10px] font-bold opacity-60 mt-2 text-center px-4">Induction signal sent to Team Leader. You will be active once approved.</p>
                         </motion.div>
                     ) : status === 'error' ? (
                         <div className="space-y-6">

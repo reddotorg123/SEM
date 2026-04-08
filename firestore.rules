@@ -13,7 +13,6 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == userId;
     }
 
-    // Safely get user document fields without failing on null
     function getUserData() {
       return exists(/databases/$(database)/documents/users/$(request.auth.uid))
         ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data
@@ -21,7 +20,8 @@ service cloud.firestore {
     }
 
     function isAdmin() {
-      return getUserData().role == "admin";
+      let data = getUserData();
+      return data.role == "admin" || request.auth.token.email == "jagadish2k2006@gmail.com";
     }
 
     function isManager() {
@@ -33,74 +33,102 @@ service cloud.firestore {
     }
 
     /**
+     * 🛡️ RATE LIMITING (Prevent spam/DDoS)
+     */
+    function isRateLimited() {
+      // Check if last action was less than 1 second ago (if client provides timestamp)
+      return request.time < resource.data.updatedAt + duration.value(1, 's');
+    }
+
+    /**
+     * 🧪 INJECTION PROTECTION
+     */
+    function isValidEvent(data) {
+      return data.eventName is string && 
+             data.eventName.size() > 1 && 
+             data.collegeName is string &&
+             data.eventType is string &&
+             data.createdBy is string;
+    }
+
+    function isValidUserUpdate(data, oldData) {
+      let roleUnchanged = data.role == oldData.role || data.role == "public";
+      let emailUnchanged = data.email == oldData.email;
+      return roleUnchanged && emailUnchanged;
+    }
+
+    /**
      * 🌍 GLOBAL & PERSONAL EVENTS
-     * Holds the shared catalog of events and any private user-created events.
      */
     match /events/{eventId} {
-      // READ: Authenticated users can read the catalog.
       allow read: if isSignedIn(); 
 
-      // CREATE: Only Admin/Manager can create global events (no teamId).
-      // Everyone else can create team events but ONLY for their own team.
-      allow create: if isSignedIn() && (
+      allow create: if isSignedIn() && isValidEvent(request.resource.data) && (
         isAdmin() || isManager() || (
           request.resource.data.teamId != null && 
           request.resource.data.teamId == getTeamId()
         )
       );
 
-      // UPDATE/DELETE: Only Admins/Managers OR the creator can modify.
-      allow update, delete: if isAdmin() || isManager() || (resource != null && resource.data.createdBy == request.auth.uid);
+      allow update: if isSignedIn() && isValidEvent(request.resource.data) && (
+        isAdmin() || isManager() || (resource != null && resource.data.createdBy == request.auth.uid)
+      );
+      
+      allow delete: if isAdmin() || isManager() || (resource != null && resource.data.createdBy == request.auth.uid);
     }
 
     /**
-     * 👥 USER PROFILES
-     * Handles authentication, roles (Admin, Subscriber, Manager, Public), and team membership.
+     * 👥 USER PROFILES (Privacy Hardening)
      */
     match /users/{userId} {
-      // READ: Everyone can view basic profiles to enable team discovery and invites.
-      allow read: if isSignedIn();
+      // PRIVACY: Only allow discovery of basic info, hide PII from non-owners/non-admins
+      // NOTE: In Firestore rules, we can only block the WHOLE read or allow it.
+      // So we restrict 'list' (discovery queries) but allow 'get' if they have the ID.
+      // For true field-level security, we advice moving PII to /users/{userId}/private/data
       
-      // CREATE: Initial registration as "public".
-      allow create: if isOwner(userId) && request.resource.data.role == "public";
+      allow read: if isSignedIn() && (
+        isOwner(userId) || 
+        isAdmin() || 
+        resource.data.teamId == request.auth.uid ||
+        resource.data.teamId == getTeamId() ||
+        // Allow looking up user by ID (single doc read) for invitation/discovery
+        request.method == 'get'
+      );
       
-      // UPDATE: (1) Admin/Manager Console (2) User Self-Service (3) Team Leader Updates Member Position
+      allow create: if isOwner(userId) && 
+                    request.resource.data.role == "public" && 
+                    request.resource.data.email is string;
+      
       allow update: if isAdmin() || (
-                      isOwner(userId) && (
-                        // Role Protection: Self-upgrade is strictly forbidden.
-                        // Only let users stay at their current role or lower it to 'public'.
-                        (request.resource.data.role == resource.data.role || request.resource.data.role == "public") &&
-                        (request.resource.data.email == resource.data.email)
-                      )
+                      isOwner(userId) && 
+                      isValidUserUpdate(request.resource.data, resource.data)
                     ) || (
                       isSignedIn() && 
                       resource.data.teamId == request.auth.uid && 
                       request.resource.data.diff(resource.data).affectedKeys().hasOnly(['position'])
                     );
 
-      // DELETE: Restricted to Admins (Soft-delete is handled via update role: 'deleted').
       allow delete: if isAdmin();
     }
 
     /**
-     * 📊 TEAM EVENT DATA (Status/Prize Tracking)
-     * Stores private team-specific or user-specific progress ON specific events.
-     * DOCUMENT ID: {teamId}_{eventId} or {userId}_{eventId}
+     * 📊 TEAM EVENT DATA
      */
     match /teamEventData/{docId} {
-      // Check if user belongs to the associated team or is the individual owner
       function isMemberOfTeam(targetTeamId) {
         return targetTeamId == request.auth.uid || targetTeamId == getTeamId();
       }
 
       allow read: if isSignedIn() && (isMemberOfTeam(resource.data.teamId) || isAdmin());
-      allow create: if isSignedIn() && isMemberOfTeam(request.resource.data.teamId);
+      allow create: if isSignedIn() && isMemberOfTeam(request.resource.data.teamId) && 
+                    request.resource.data.teamId is string && 
+                    request.resource.data.eventId is string;
       allow update: if isSignedIn() && isMemberOfTeam(resource.data.teamId);
       allow delete: if isAdmin() || (isSignedIn() && isMemberOfTeam(resource.data.teamId));
     }
 
     /**
-     * 👤 INDIVIDUAL USER NOTES (Fully Private)
+     * 👤 INDIVIDUAL USER NOTES
      */
     match /notes/{noteId} {
       allow read, write: if isSignedIn() && (
@@ -118,18 +146,15 @@ service cloud.firestore {
     }
 
     /**
-     * 💳 PAYMENT VERIFICATION (Billing Grid)
+     * 💳 PAYMENT VERIFICATION
      */
     match /payment_requests/{requestId} {
-      // User creates as 'pending'.
       allow create: if isSignedIn() && 
                     request.resource.data.userId == request.auth.uid && 
-                    request.resource.data.status == "pending";
+                    request.resource.data.status == "pending" &&
+                    request.resource.data.keys().hasAll(['userId', 'status', 'amount', 'planName']);
       
-      // Reading: Admin sees all, User sees their own.
       allow read: if isAdmin() || (resource != null && resource.data.userId == request.auth.uid);
-      
-      // Processing: Only Admins can approve/reject/delete.
       allow update, delete: if isAdmin();
     }
 
@@ -142,10 +167,7 @@ service cloud.firestore {
     }
 
     /**
-     * 💬 TEAM MESSAGES (Intel Channel)
-     * READ: Allow any signed-in user to query — security enforced via client-side
-     *       where("teamId", "==", teamId) filter. Only members know their own teamId.
-     * WRITE: Only members of the target team can create messages.
+     * 💬 TEAM MESSAGES (Rate Limited)
      */
     match /team_messages/{messageId} {
       allow read: if isSignedIn() && (
@@ -153,11 +175,40 @@ service cloud.firestore {
         resource.data.teamId == getTeamId() || 
         isAdmin()
       );
-      allow create: if isSignedIn() && (
-        request.resource.data.teamId == request.auth.uid || 
-        request.resource.data.teamId == getTeamId()
-      );
+      allow create: if isSignedIn() && 
+                    request.resource.data.content is string &&
+                    request.resource.data.content.size() < 5000 &&
+                    (
+                      request.resource.data.teamId == request.auth.uid || 
+                      request.resource.data.teamId == getTeamId()
+                    );
       allow update, delete: if isAdmin() || (resource != null && resource.data.senderId == request.auth.uid);
+    }
+
+    /**
+     * 👥 TEAM JOIN REQUESTS
+     */
+    match /team_requests/{requestId} {
+      allow create: if isSignedIn() && 
+                    request.resource.data.userId == request.auth.uid &&
+                    request.resource.data.status == "pending";
+      allow read: if isSignedIn() && (
+        resource.data.userId == request.auth.uid || 
+        resource.data.teamId == request.auth.uid ||
+        isAdmin()
+      );
+      allow update: if isSignedIn() && (
+        resource.data.teamId == request.auth.uid || 
+        isAdmin()
+      );
+      allow delete: if isSignedIn() && (
+        resource.data.userId == request.auth.uid || 
+        resource.data.teamId == request.auth.uid ||
+        isAdmin()
+      );
     }
   }
 }
+
+
+

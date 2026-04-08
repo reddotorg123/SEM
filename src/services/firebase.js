@@ -8,6 +8,7 @@
  */
 
 import { initializeApp } from "firebase/app";
+import { initializeAppCheck, ReCaptchaV3Provider } from "firebase/app-check";
 import {
     getFirestore,
     collection,
@@ -23,6 +24,7 @@ import {
     updateDoc,
     where
 } from "firebase/firestore";
+
 import {
     getMessaging,
     getToken,
@@ -55,6 +57,25 @@ export const initFirebase = (config) => {
         // Only initialize once to prevent "duplicate app" errors
         if (!app) {
             app = initializeApp(config);
+            
+            // 🛡️ APP CHECK: Anti-DDoS & Bot Protection
+            if (typeof window !== 'undefined') {
+                try {
+                    const siteKey = config.appCheckSiteKey || import.meta.env.VITE_RECAPTCHA_SITE_KEY;
+                    if (siteKey) {
+                        initializeAppCheck(app, {
+                            provider: new ReCaptchaV3Provider(siteKey),
+                            isTokenAutoRefreshEnabled: true
+                        });
+                        console.log("🛡️ App Check activated. Identity verification in progress.");
+                    } else {
+                        console.warn("🛡️ App Check skipped: No Site Key provided.");
+                    }
+                } catch (checkErr) {
+                    console.error("🛡️ App Check fail:", checkErr);
+                }
+            }
+
             db = getFirestore(app);
             auth = getAuth(app);
             
@@ -320,10 +341,20 @@ export const createPaymentRequest = async (requestData) => {
         throw new Error("Firestore is not initialized. Please check your Firebase configuration in Settings.");
     }
 
-    // Fallback for environment where crypto.randomUUID might not be available
-    const requestId = (typeof crypto !== 'undefined' && crypto.randomUUID)
-        ? crypto.randomUUID()
-        : Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+    // Use a secure random generator for IDs
+    const generateSecureId = () => {
+        if (typeof crypto !== 'undefined') {
+            if (crypto.randomUUID) return crypto.randomUUID();
+            if (crypto.getRandomValues) {
+                return ([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g, c =>
+                    (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16)
+                );
+            }
+        }
+        return Math.random().toString(36).substring(2, 15) + Date.now().toString(36);
+    };
+
+    const requestId = generateSecureId();
 
     const requestRef = doc(db, "payment_requests", requestId);
 
@@ -592,6 +623,104 @@ export const rejectPaymentRequest = async (requestId, userId) => {
 };
 
 /**
+ * FIRESTORE: Disbands a team (Leader action). Resets all members.
+ */
+export const disbandTeam = async (leaderId) => {
+    if (!db) throw new Error("Firestore not initialized");
+    
+    // 1. Find all members of this team
+    const members = await getTeamMembers(leaderId);
+    
+    const batch = writeBatch(db);
+    
+    members.forEach(member => {
+        const memberRef = doc(db, "users", member.id);
+        batch.update(memberRef, {
+            teamId: member.id, // return to their own ID
+            position: 'Explorer',
+            role: (member.role === 'admin' || member.role === 'event_manager') ? member.role : 'public'
+        });
+    });
+
+    // 2. Clear leader's invite code if any
+    const leaderRef = doc(db, "users", leaderId);
+    batch.update(leaderRef, { inviteCode: null });
+
+    await batch.commit();
+};
+
+/**
+ * FIRESTORE: Request to join a team (Induction request)
+ */
+export const requestJoinTeam = async (userId, userName, teamId) => {
+    if (!db) throw new Error("Firestore not initialized");
+    
+    const requestId = `${userId}_to_${teamId}`;
+    const requestRef = doc(db, "team_requests", requestId);
+    
+    await setDoc(requestRef, {
+        requestId,
+        userId,
+        userName,
+        teamId,
+        status: 'pending',
+        createdAt: new Date().toISOString()
+    });
+
+    return requestId;
+};
+
+/**
+ * FIRESTORE: Approve a team join request
+ */
+export const approveJoinTeam = async (requestId, userId, teamId) => {
+    if (!db) throw new Error("Firestore not initialized");
+    
+    const batch = writeBatch(db);
+    
+    // 1. Update request status
+    const requestRef = doc(db, "team_requests", requestId);
+    batch.update(requestRef, {
+        status: 'approved',
+        approvedAt: new Date().toISOString()
+    });
+
+    // 2. Update user team
+    const userRef = doc(db, "users", userId);
+    batch.update(userRef, {
+        teamId: teamId,
+        role: 'member'
+    });
+
+    await batch.commit();
+};
+
+/**
+ * FIRESTORE: Rejects a team join request
+ */
+export const rejectJoinTeam = async (requestId) => {
+    if (!db) throw new Error("Firestore not initialized");
+    await deleteDoc(doc(db, "team_requests", requestId));
+};
+
+/**
+ * FIRESTORE: Live subscribe to team requests for a leader
+ */
+export const subscribeToTeamRequests = (teamId, callback) => {
+    if (!db || !teamId) return null;
+    const q = query(
+        collection(db, "team_requests"), 
+        where("teamId", "==", teamId),
+        where("status", "==", "pending")
+    );
+    return onSnapshot(q, (snapshot) => {
+        const reqs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        callback(reqs);
+    });
+};
+
+
+/**
  * FIRESTORE: Allows a user to leave their current team and return to their personal team.
  */
 export const leaveTeam = async (uid) => {
@@ -610,10 +739,20 @@ export const leaveTeam = async (uid) => {
  */
 export const sendTeamMessage = async (teamId, senderId, senderName, content) => {
     if (!db) throw new Error("Firestore not initialized");
-    // Fallback for environment where crypto.randomUUID might not be available
-    const messageId = (typeof crypto !== 'undefined' && crypto.randomUUID)
-        ? crypto.randomUUID()
-        : Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+    // Cryptographically secure random ID generator as fallback
+    const generateSecureId = () => {
+        if (typeof crypto !== 'undefined') {
+            if (crypto.randomUUID) return crypto.randomUUID();
+            if (crypto.getRandomValues) {
+                return ([1e7]+-1e3+-4e3+-8e3+-1e11).replace(/[018]/g, c =>
+                    (c ^ crypto.getRandomValues(new Uint8Array(1))[0] & 15 >> c / 4).toString(16)
+                );
+            }
+        }
+        return Math.random().toString(36).substring(2, 15) + Date.now().toString(36);
+    };
+
+    const messageId = generateSecureId();
     const messageRef = doc(db, "team_messages", messageId);
     
     await setDoc(messageRef, {

@@ -22,6 +22,7 @@ const TeamInviteModal = () => {
     const [isAdding, setIsAdding] = useState(false);
     const [isLoadingMembers, setIsLoadingMembers] = useState(false);
     const [addStatus, setAddStatus] = useState({ type: '', msg: '' });
+    const [joinRequests, setJoinRequests] = useState([]);
 
     // Load team members
     const fetchMembers = async () => {
@@ -51,6 +52,11 @@ const TeamInviteModal = () => {
                         if (data.inviteCode) setInviteCode(data.inviteCode);
                     }
                 });
+
+                // Real-time subscribe to join requests
+                const { subscribeToTeamRequests } = require('../services/firebase');
+                const unsubscribe = subscribeToTeamRequests(ownerId, setJoinRequests);
+                return () => unsubscribe && unsubscribe();
             }
         }
     }, [isOpen, teamId]);
@@ -134,6 +140,38 @@ const TeamInviteModal = () => {
         try {
             await updateMemberPosition(uid, pos);
             setMembers(members.map(m => m.id === uid ? { ...m, position: pos } : m));
+        } catch (error) {
+            console.error(error);
+        }
+    };
+
+    const handleApproveRequest = async (req) => {
+        try {
+            const { approveJoinTeam } = await import('../services/firebase');
+            await approveJoinTeam(req.requestId, req.userId, req.teamId);
+            fetchMembers();
+        } catch (error) {
+            console.error(error);
+        }
+    };
+
+    const handleRejectRequest = async (requestId) => {
+        try {
+            const { rejectJoinTeam } = await import('../services/firebase');
+            await rejectJoinTeam(requestId);
+        } catch (error) {
+            console.error(error);
+        }
+    };
+
+    const handleDisbandTeam = async () => {
+        const ownerId = teamId || auth?.currentUser?.uid;
+        if (!window.confirm("CRITICAL ALERT: Disbanding will reset the entire Tactical Unit. All members will be detached. Proceed?")) return;
+        try {
+            const { disbandTeam } = await import('../services/firebase');
+            await disbandTeam(ownerId);
+            closeModal('teamInvite');
+            window.location.reload();
         } catch (error) {
             console.error(error);
         }
@@ -236,8 +274,43 @@ const TeamInviteModal = () => {
                                             <Sparkles size={14} /> How to add members
                                         </h3>
                                         <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400 leading-relaxed">
-                                            To add members to your team, share your <span className="text-indigo-600 dark:text-indigo-400">Unit Frequency link</span> found below. When they click the link, they will be automatically inducted into your Tactical Unit.
+                                            To add members, share your <span className="text-indigo-600 dark:text-indigo-400">Unit Frequency link</span> found below. When they apply, you will receive a notification to approve their induction.
                                         </p>
+                                    </div>
+                                )}
+
+                                {/* Induction Requests (Approvals) */}
+                                {joinRequests.length > 0 && (
+                                    <div className="space-y-4 animate-in fade-in slide-in-from-top-4">
+                                        <h3 className="text-[10px] font-black uppercase tracking-widest text-amber-500 flex items-center gap-2">
+                                            <LogIn size={14} /> PENDING INDUCTIONS ({joinRequests.length})
+                                        </h3>
+                                        <div className="grid grid-cols-1 gap-3">
+                                            {joinRequests.map(req => (
+                                                <div key={req.id} className="flex items-center justify-between p-4 bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800/30 rounded-2xl">
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="w-8 h-8 rounded-lg bg-amber-500 flex items-center justify-center text-white text-[10px] font-black">
+                                                            {req.userName.substring(0,1).toUpperCase()}
+                                                        </div>
+                                                        <span className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-tighter">{req.userName}</span>
+                                                    </div>
+                                                    <div className="flex gap-2">
+                                                        <button 
+                                                            onClick={() => handleApproveRequest(req)}
+                                                            className="px-4 py-1.5 bg-emerald-500 text-white rounded-xl text-[9px] font-black uppercase tracking-widest hover:scale-105 active:scale-95 transition-all shadow-lg shadow-emerald-500/20"
+                                                        >
+                                                            Approve
+                                                        </button>
+                                                        <button 
+                                                            onClick={() => handleRejectRequest(req.requestId)}
+                                                            className="px-4 py-1.5 bg-rose-50 dark:bg-rose-900/20 text-rose-500 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-rose-500 hover:text-white transition-all"
+                                                        >
+                                                            Reject
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
                                     </div>
                                 )}
 
@@ -311,6 +384,32 @@ const TeamInviteModal = () => {
                                     </div>
                                     {!inviteCode && (
                                         <button onClick={generateLink} disabled={isGenerating} className="mt-4 w-full text-[9px] font-black uppercase tracking-widest text-indigo-200 hover:text-white transition-all underline underline-offset-4">Synchronize Network Code</button>
+                                    )}
+                                </div>
+
+                                {/* Danger Zone / Leave Actions */}
+                                <div className="pt-6 border-t border-slate-100 dark:border-slate-800 flex flex-wrap gap-4 justify-between">
+                                    {(userRole === 'member' || (teamId && teamId !== user.uid)) ? (
+                                        <button 
+                                            onClick={async () => {
+                                                if(window.confirm("Abandon tactical unit and return to personal workspace?")) {
+                                                    const { leaveTeam } = await import('../services/firebase');
+                                                    await leaveTeam(user.uid);
+                                                    closeModal('teamInvite');
+                                                    window.location.reload();
+                                                }
+                                            }}
+                                            className="px-6 py-3 bg-rose-50 dark:bg-rose-900/10 text-rose-500 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-rose-500 hover:text-white transition-all border border-rose-100 dark:border-rose-900/30"
+                                        >
+                                            Abandon Team
+                                        </button>
+                                    ) : (
+                                        <button 
+                                            onClick={handleDisbandTeam}
+                                            className="flex items-center gap-2 px-6 py-3 bg-slate-900 text-white dark:bg-white dark:text-slate-900 rounded-xl font-black text-[10px] uppercase tracking-widest hover:scale-105 active:scale-95 transition-all shadow-xl"
+                                        >
+                                            <Trash2 size={14} /> Disband Tactical Unit
+                                        </button>
                                     )}
                                 </div>
                             </div>

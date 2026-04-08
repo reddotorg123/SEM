@@ -264,6 +264,16 @@ function App() {
     }, [isLoading, user, cloudProvider, firebaseConfig, teamId, userRole]);
 
     /**
+     * EFFECT: Push Notifications & Background Listeners
+     */
+    useEffect(() => {
+        if (!isLoading && user) {
+            const { initNotificationSystem } = require('./notifications');
+            initNotificationSystem();
+        }
+    }, [isLoading, user, userRole]);
+
+    /**
      * EFFECT: System Maintenance
      * Runs periodic tasks like status updates and notification checks.
      */
