@@ -73,7 +73,7 @@ export default defineConfig({
                     }
                 ]
             }
-        })
+        }),
         compression({
             verbose: false,
             disable: false,
