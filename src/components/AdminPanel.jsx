@@ -29,7 +29,7 @@ import {
 } from 'lucide-react';
 import { useAppStore } from '../store';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { db } from '../db';
+import { db, getMergedEvents } from '../db';
 import { 
     getAllUsers, 
     updateUserRole, 
@@ -37,7 +37,12 @@ import {
     approvePaymentRequest, 
     rejectPaymentRequest,
     deleteEventFromFirestore,
-    deleteUserData
+    deleteUserData,
+    getTeamMembers,
+    subscribeToTeamRequests,
+    auth,
+    approveJoinTeam,
+    rejectJoinTeam
 } from '../services/firebase';
 import { format } from 'date-fns';
 import { cn } from '../utils';
@@ -60,7 +65,6 @@ const AdminPanel = () => {
     const [teamMembers, setTeamMembers] = useState([]);
     const teamId = useAppStore((state) => state.teamId);
     const localEvents = useLiveQuery(async () => {
-        const { getMergedEvents } = await import('../db');
         return await getMergedEvents();
     }, [teamId]) || [];
 
@@ -102,7 +106,6 @@ const AdminPanel = () => {
             const loadMembers = async () => {
                 setIsLoading(true);
                 try {
-                    const { getTeamMembers, subscribeToTeamRequests, auth } = await import('../services/firebase');
                     if (auth?.currentUser) {
                         const members = await getTeamMembers(auth.currentUser.uid);
                         setTeamMembers(members);
@@ -175,11 +178,9 @@ const AdminPanel = () => {
     const handleTeamRequestAction = async (req, action) => {
         try {
             if (action === 'approve') {
-                const { approveJoinTeam } = await import('../services/firebase');
                 await approveJoinTeam(req.id, req.userId, req.teamId);
                 setTeamRequests(prev => prev.filter(r => r.id !== req.id));
             } else {
-                const { rejectJoinTeam } = await import('../services/firebase');
                 await rejectJoinTeam(req.id);
                 setTeamRequests(prev => prev.filter(r => r.id !== req.id));
             }

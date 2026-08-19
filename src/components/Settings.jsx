@@ -2,7 +2,7 @@ import React from 'react';
 import { useAppStore } from '../store';
 import { db, getAllEvents } from '../db';
 import { exportToCSV, downloadCSV } from '../csvUtils';
-import { requestNotificationPermission } from '../notifications';
+import { requestNotificationPermission, initNotificationSystem } from '../notifications';
 import { bulkSyncToFirestore, getAllUsers, updateUserRole, getPaymentRequests, approvePaymentRequest, rejectPaymentRequest } from '../services/firebase';
 import { Bell, Download, Trash2, Moon, Sun, Shield, Database, Smartphone, Cloud, Loader2, ArrowUpFromLine, Info, ChevronRight, LogOut, CheckCircle2, ShieldCheck, UserCog, Eye, EyeOff, ShieldAlert } from 'lucide-react';
 import { cn } from '../utils';
@@ -467,7 +467,6 @@ const Settings = () => {
                         </div>
                         <button 
                             onClick={async () => {
-                                const { initNotificationSystem } = await import('../notifications');
                                 const granted = await initNotificationSystem();
                                 if (granted) alert("✅ Success: This device is now registered for Intelligence Intel (Push Notifications).");
                                 else alert("❌ Error: Notification permission denied or device unsupported.");

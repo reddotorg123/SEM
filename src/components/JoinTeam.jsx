@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAppStore } from '../store';
 import { doc, updateDoc, getDoc, query, collection, where, getDocs } from 'firebase/firestore';
-import { db, auth, getTeamMembers } from '../services/firebase';
+import { db, auth, getTeamMembers, requestJoinTeam } from '../services/firebase';
 import { ShieldCheck, Users, Loader2, ArrowRight, LogIn, AlertTriangle } from 'lucide-react';
 
 const JoinTeam = () => {
@@ -108,7 +108,6 @@ const JoinTeam = () => {
         setStatus('loading');
         try {
             if (db && auth?.currentUser) {
-                const { requestJoinTeam } = await import('../services/firebase');
                 await requestJoinTeam(auth.currentUser.uid, user.displayName || 'Anonymous Unit', resolvedTeamId);
                 
                 setStatus('success');

@@ -11,10 +11,10 @@
 import React, { useEffect, useState, lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, useLocation, Navigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
-import { db, updateAllEventStatuses } from './db';
+import { db, updateAllEventStatuses, bulkImportEvents, bulkImportTeamEventData } from './db';
 import { useAppStore } from './store';
 import { initNotificationSystem } from './notifications';
-import { initFirebase, getUserData } from './services/firebase';
+import { initFirebase, getUserData, subscribeToUserData, subscribeToGlobalEvents, subscribeToTeamEventData } from './services/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { cn } from './utils';
 
@@ -189,7 +189,6 @@ function App() {
 
                     if (firebaseUser) {
                         try {
-                            const { subscribeToUserData } = await import('./services/firebase');
                             unsubscribeUserData = subscribeToUserData(firebaseUser.uid, (userData) => {
                                 useAppStore.getState().setUserRole(userData.role);
                                 useAppStore.getState().setTeamId(userData.teamId);
@@ -233,41 +232,26 @@ function App() {
         let unsubscribeGlobal = () => { };
         let unsubscribeTeamStats = () => { };
 
-        const startSync = async () => {
-            try {
-                const { 
-                    subscribeToGlobalEvents, 
-                    subscribeToTeamEventData 
-                } = await import('./services/firebase');
+        console.log('[Sync] Starting dual-channel real-time sync...');
 
-                console.log('[Sync] Starting dual-channel real-time sync...');
+        // 1. Sync Shared Events Catalog
+        unsubscribeGlobal = subscribeToGlobalEvents(
+            async (remoteEvents) => {
+                await bulkImportEvents(remoteEvents, true);
+            },
+            (error) => console.error('[Sync] Global events failed:', error)
+        );
 
-                // 1. Sync Shared Events Catalog
-                unsubscribeGlobal = subscribeToGlobalEvents(
-                    async (remoteEvents) => {
-                        const { bulkImportEvents } = await import('./db');
-                        await bulkImportEvents(remoteEvents, true);
-                    },
-                    (error) => console.error('[Sync] Global events failed:', error)
-                );
-
-                // 2. Sync Private Team Performance Data
-                if (teamId) {
-                    unsubscribeTeamStats = subscribeToTeamEventData(
-                        teamId,
-                        async (statsMap) => {
-                            const { bulkImportTeamEventData } = await import('./db');
-                            await bulkImportTeamEventData(statsMap, teamId);
-                        },
-                        (error) => console.error('[Sync] Team performance sync failed:', error)
-                    );
-                }
-            } catch (error) {
-                console.error('[Sync] Setup crash:', error);
-            }
-        };
-
-        startSync();
+        // 2. Sync Private Team Performance Data
+        if (teamId) {
+            unsubscribeTeamStats = subscribeToTeamEventData(
+                teamId,
+                async (statsMap) => {
+                    await bulkImportTeamEventData(statsMap, teamId);
+                },
+                (error) => console.error('[Sync] Team performance sync failed:', error)
+            );
+        }
 
         return () => {
             unsubscribeGlobal();
@@ -280,9 +264,11 @@ function App() {
      */
     useEffect(() => {
         if (!isLoading && user) {
-            import('./notifications').then(({ initNotificationSystem }) => {
+            try {
                 initNotificationSystem();
-            }).catch(err => console.error('[Push] System Init Failed:', err));
+            } catch (err) {
+                console.error('[Push] System Init Failed:', err);
+            }
         }
     }, [isLoading, user]);
 

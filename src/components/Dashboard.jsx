@@ -1,14 +1,14 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { motion, AnimatePresence } from 'framer-motion';
-import { db } from '../db';
+import { db, getMergedEvents } from '../db';
 import { useAppStore } from '../store';
 import EventCard from './EventCard';
 import { TrendingUp, Calendar, Clock, Trophy, Plus, FileUp, Zap, Sparkles, Shield, Bell, Target, ArrowRight, Users, User, Crown, Edit2, Check, X, LogOut, MessageSquare, Send } from 'lucide-react';
 import { useNavigate, Link } from 'react-router-dom';
 import { format, isToday, isThisWeek, differenceInDays, startOfDay, addDays, isAfter, isBefore } from 'date-fns';
-import { cn } from '../utils';
-import { getTeamMembers, leaveTeam, sendTeamMessage, subscribeToTeamMessages, updateMemberPosition, updateUserStats, subscribeToTeamMembers } from '../services/firebase';
+import { cn, parseMarkdown } from '../utils';
+import { getTeamMembers, leaveTeam, sendTeamMessage, subscribeToTeamMessages, updateMemberPosition, updateUserStats, subscribeToTeamMembers, subscribeToTeamRequests } from '../services/firebase';
 import { useRef } from 'react';
 import { showNotification } from '../notifications';
 
@@ -105,10 +105,8 @@ const Dashboard = () => {
             // Subscribe to join requests if user is leader
             let unsubscribeRequests = () => {};
             if (user?.uid === teamId) {
-                import('../services/firebase').then(({ subscribeToTeamRequests }) => {
-                    unsubscribeRequests = subscribeToTeamRequests(teamId, (reqs) => {
-                        setTeamRequests(reqs);
-                    });
+                unsubscribeRequests = subscribeToTeamRequests(teamId, (reqs) => {
+                    setTeamRequests(reqs);
                 });
             }
             
@@ -133,6 +131,7 @@ const Dashboard = () => {
             return () => {
                 if (unsubscribeMembers) unsubscribeMembers();
                 if (unsubscribeMessages) unsubscribeMessages();
+                if (unsubscribeRequests) unsubscribeRequests();
             };
         }
     }, [teamId]);
@@ -150,7 +149,6 @@ const Dashboard = () => {
 
     // Live data from Dexie (Merged with Team Stats)
     const events = useLiveQuery(async () => {
-        const { getMergedEvents } = await import('../db');
         return await getMergedEvents();
     }, [teamId]) || [];
 
@@ -682,12 +680,13 @@ const Dashboard = () => {
                                                             <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">{msg.senderName || 'Unknown'}</span>
                                                             <span className="text-[7px] text-slate-500">{format(new Date(msg.timestamp), 'HH:mm')}</span>
                                                         </div>
-                                                        <div className={cn(
-                                                            "px-4 py-2 rounded-2xl text-xs font-bold max-w-[85%] break-words",
-                                                            msg.senderId === user?.uid ? "bg-indigo-600 text-white rounded-tr-none" : "bg-white dark:bg-slate-900 text-slate-900 dark:text-white border border-slate-100 dark:border-slate-800 rounded-tl-none shadow-sm"
-                                                        )}>
-                                                            {msg.content}
-                                                        </div>
+                                                        <div 
+                                                            className={cn(
+                                                                "px-4 py-2 rounded-2xl text-xs font-bold max-w-[85%] break-words",
+                                                                msg.senderId === user?.uid ? "bg-indigo-600 text-white rounded-tr-none" : "bg-white dark:bg-slate-900 text-slate-900 dark:text-white border border-slate-100 dark:border-slate-800 rounded-tl-none shadow-sm"
+                                                            )}
+                                                            dangerouslySetInnerHTML={{ __html: parseMarkdown(msg.content) }}
+                                                        />
                                                     </div>
                                                 )) : (
                                                     <div className="h-full flex flex-col items-center justify-center text-center p-6">

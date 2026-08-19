@@ -38,6 +38,7 @@ import {
     signOut,
     onAuthStateChanged
 } from "firebase/auth";
+import { showNotification } from '../notifications';
 
 // These variables will hold our active instances once initialized
 export let db = null;   // Firestore instance
@@ -397,12 +398,14 @@ export const subscribeToGlobalEvents = (callback, onError) => {
                 if (newEvent.createdAt) {
                     const ageInMs = new Date() - new Date(newEvent.createdAt);
                     if (ageInMs < 2 * 60 * 1000) {
-                        import('../notifications').then(({ showNotification }) => {
+                        try {
                             showNotification(`New Event Alert: ${newEvent.eventName}`, {
                                 body: `A new event is available at ${newEvent.collegeName}`,
                                 tag: `global-event-${change.doc.id}`
                             });
-                        }).catch(err => console.error("Notification trigger fail:", err));
+                        } catch (err) {
+                            console.error("Notification trigger fail:", err);
+                        }
                     }
                 }
             }
@@ -551,12 +554,14 @@ export const subscribeToPaymentRequests = (callback) => {
                 if (req.createdAt) {
                     const ageInMs = new Date() - new Date(req.createdAt);
                     if (ageInMs < 2 * 60 * 1000) {
-                        import('../notifications').then(({ showNotification }) => {
+                        try {
                             showNotification(`New Access Request: ${req.userName}`, {
                                 body: `${req.userName} has submitted a payment for Verification.`,
                                 tag: `payment-req-${change.doc.id}`
                             });
-                        }).catch(err => console.error("Notification trigger fail:", err));
+                        } catch (err) {
+                            console.error("Notification trigger fail:", err);
+                        }
                     }
                 }
             }

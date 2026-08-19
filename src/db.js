@@ -7,7 +7,7 @@
 
 import Dexie from 'dexie';
 import { useAppStore } from './store';
-import { saveEventToFirestore, deleteEventFromFirestore } from './services/firebase';
+import { saveEventToFirestore, deleteEventFromFirestore, saveTeamEventData } from './services/firebase';
 
 /**
  * Define the Database Schema
@@ -272,7 +272,6 @@ export const updateTeamEventStatus = async (eventId, updates) => {
 
     if (cloudProvider === 'firestore') {
         try {
-            const { saveTeamEventData } = await import('./services/firebase');
             await saveTeamEventData(teamId, eventId, updates);
         } catch (e) {
             console.error('[Sync Fail] Team event data sync failed:', e);
@@ -413,9 +412,22 @@ export const bulkImportEvents = async (eventsArray, overwrite = false) => {
             }
             if (localIdToUpdate) {
                 const localEvent = existingEvents.find(e => e.id === localIdToUpdate);
-                if (localEvent?.posterBlob && !processed.posterBlob) processed.posterBlob = localEvent.posterBlob;
-                await db.events.update(localIdToUpdate, { ...processed, id: localIdToUpdate, serverId: remoteSid });
-                updated++;
+                
+                // Conflict resolution: Check if local modification timestamp is newer than incoming remote timestamp
+                const localUpdateTs = localEvent?.updatedAt ? new Date(localEvent.updatedAt).getTime() : 0;
+                const remoteUpdateTs = processed.updatedAt ? new Date(processed.updatedAt).getTime() : 0;
+
+                if (localUpdateTs > remoteUpdateTs) {
+                    console.log(`[DB] Conflict resolution for "${processed.eventName}": local copy is newer. Skipping overwrite.`);
+                    const cloudProvider = useAppStore.getState().cloudProvider;
+                    if (cloudProvider === 'firestore') {
+                        saveEventToFirestore(localEvent).catch(err => console.error('[DB] Failed to sync newer local change:', err));
+                    }
+                } else {
+                    if (localEvent?.posterBlob && !processed.posterBlob) processed.posterBlob = localEvent.posterBlob;
+                    await db.events.update(localIdToUpdate, { ...processed, id: localIdToUpdate, serverId: remoteSid });
+                    updated++;
+                }
             } else {
                 delete processed.id;
                 await db.events.add(processed);

@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { motion, AnimatePresence } from 'framer-motion';
-import { db } from '../db';
+import { db, getMergedEvents } from '../db';
 import { useAppStore } from '../store';
 import {
     startOfMonth,
@@ -23,7 +23,7 @@ import { cn } from '../utils';
 const CalendarView = () => {
     const teamId = useAppStore((state) => state.teamId);
     const events = useLiveQuery(async () => {
-        const { getMergedEvents } = await import('../db');
+        
         return await getMergedEvents();
     }, [teamId]) || [];
     const [currentDate, setCurrentDate] = useState(new Date());

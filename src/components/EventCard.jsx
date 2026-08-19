@@ -7,7 +7,7 @@ import {
     Calendar, MapPin, Trophy, Clock, Heart, Zap, Users, ShieldCheck,
     Globe, Pin, IndianRupee, Trash2, Edit, ExternalLink
 } from 'lucide-react';
-import { updateEvent, deleteEvent } from '../db';
+import { updateEvent, deleteEvent, updateTeamEventStatus } from '../db';
 
 const safeFormat = (date, formatStr) => {
     try {
@@ -193,7 +193,7 @@ const EventCard = React.memo(({ event, compact = false }) => {
                         <button 
                             onClick={async (e) => { 
                                 e.stopPropagation(); 
-                                const { updateTeamEventStatus } = await import('../db');
+                                
                                 await updateTeamEventStatus(event.serverId || event.id, { isShortlisted: !event.isShortlisted }); 
                             }} 
                             className={cn("p-1.5 rounded-lg transition-colors", event.isShortlisted ? "text-rose-500 bg-rose-50" : "text-slate-400 hover:bg-slate-100")}

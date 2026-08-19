@@ -4,7 +4,7 @@ import { X, Users, Link as LinkIcon, CheckCircle2, Copy, Plus, Loader2, Trash2, 
 import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../store';
 import { doc, getDoc, updateDoc, collection, query, where, getDocs } from 'firebase/firestore';
-import { auth, db, getTeamMembers, updateMemberPosition } from '../services/firebase';
+import { auth, db, getTeamMembers, updateMemberPosition, subscribeToTeamRequests, approveJoinTeam, rejectJoinTeam, disbandTeam, leaveTeam } from '../services/firebase';
 
 const TeamInviteModal = () => {
     const isOpen = useAppStore((state) => state.modals.teamInvite);
@@ -60,11 +60,9 @@ const TeamInviteModal = () => {
                 });
 
                 // Real-time subscribe to join requests
-                import('../services/firebase').then(({ subscribeToTeamRequests }) => {
-                    if (isSubscribed) {
-                        unsubscribeFn = subscribeToTeamRequests(ownerId, setJoinRequests);
-                    }
-                });
+                if (isSubscribed) {
+                    unsubscribeFn = subscribeToTeamRequests(ownerId, setJoinRequests);
+                }
             }
         }
 
@@ -175,7 +173,6 @@ const TeamInviteModal = () => {
 
     const handleApproveRequest = async (req) => {
         try {
-            const { approveJoinTeam } = await import('../services/firebase');
             await approveJoinTeam(req.requestId, req.userId, req.teamId);
             fetchMembers();
         } catch (error) {
@@ -185,7 +182,6 @@ const TeamInviteModal = () => {
 
     const handleRejectRequest = async (requestId) => {
         try {
-            const { rejectJoinTeam } = await import('../services/firebase');
             await rejectJoinTeam(requestId);
         } catch (error) {
             console.error(error);
@@ -196,7 +192,6 @@ const TeamInviteModal = () => {
         const ownerId = teamId || auth?.currentUser?.uid;
         if (!window.confirm("CRITICAL ALERT: Disbanding will reset the entire Tactical Unit. All members will be detached. Proceed?")) return;
         try {
-            const { disbandTeam } = await import('../services/firebase');
             await disbandTeam(ownerId);
             closeModal('teamInvite');
             window.location.reload();
@@ -424,7 +419,6 @@ const TeamInviteModal = () => {
                                         <button 
                                             onClick={async () => {
                                                 if(window.confirm("Abandon tactical unit and return to personal workspace?")) {
-                                                    const { leaveTeam } = await import('../services/firebase');
                                                     await leaveTeam(user.uid);
                                                     closeModal('teamInvite');
                                                     window.location.reload();

@@ -4,6 +4,7 @@ import { onMessage } from 'firebase/messaging';
 import { messaging } from './services/firebase';
 import { collection, query, orderBy, onSnapshot, where } from 'firebase/firestore';
 import { differenceInDays } from 'date-fns';
+import { getMergedEvents } from './db';
 
 // ─── Helper: push to both browser + in-app inbox ────────────────────────────
 const pushNotification = (title, options = {}) => {
@@ -213,9 +214,7 @@ export const initNotificationSystem = async () => {
 
         // Check deadlines immediately on load, then every hour
         const runCheck = () => {
-            import('./db').then(({ getMergedEvents }) => {
-                getMergedEvents().then(events => checkDueNotifications(events));
-            });
+            getMergedEvents().then(events => checkDueNotifications(events));
         };
         runCheck();
         setInterval(runCheck, 60 * 60 * 1000);

@@ -2,11 +2,11 @@ import React, { useRef, useState, useEffect, useMemo } from 'react';
 import DOMPurify from 'dompurify';
 import ReactDOM from 'react-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { db, updateEvent, deleteEvent, EventStatus, setUserEventStat, getUserEventStat } from '../db';
+import { db, updateEvent, deleteEvent, EventStatus, setUserEventStat, getUserEventStat, updateTeamEventStatus } from '../db';
 import { useAppStore } from '../store';
-import { X, Calendar, MapPin, Trophy, Users, ExternalLink, Trash2, Edit, Clock, Sparkles, Heart, Phone, Info, Globe, Shield, ShieldCheck, Zap, Share2 } from 'lucide-react';
+import { X, Calendar, MapPin, Trophy, Users, ExternalLink, Trash2, Edit, Clock, Sparkles, Heart, Phone, Info, Globe, Shield, ShieldCheck, Zap, Share2, Download } from 'lucide-react';
 import { format } from 'date-fns';
-import { cn, resolveImageUrl, getDefaultPoster } from '../utils';
+import { cn, resolveImageUrl, getDefaultPoster, downloadIcsFile, getGoogleCalendarUrl } from '../utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { saveUserEventStat } from '../services/firebase';
 import { IndianRupee } from 'lucide-react';
@@ -231,7 +231,6 @@ const EventDetailsModal = () => {
     };
 
     const handleStatusChange = async (newStatus) => {
-        const { updateTeamEventStatus } = await import('../db');
         const eventId = event.serverId || event.id;
         if (!eventId) return alert("Wait for sync to complete before tracking.");
         await updateTeamEventStatus(eventId, { status: newStatus });
@@ -241,7 +240,6 @@ const EventDetailsModal = () => {
         const amount = prompt("Enter prize amount won by your team:", event.prizeWon || 0);
         if (amount === null) return;
         const eventId = event.serverId || event.id;
-        const { updateTeamEventStatus } = await import('../db');
         await updateTeamEventStatus(eventId, { prizeWon: parseFloat(amount) || 0 });
     };
 
@@ -316,7 +314,6 @@ const EventDetailsModal = () => {
                                 if (userRole === 'public') {
                                     openModal('payment');
                                 } else {
-                                    const { updateTeamEventStatus } = await import('../db');
                                     await updateTeamEventStatus(event.serverId, { isShortlisted: !event.isShortlisted });
                                 }
                             }}
@@ -372,7 +369,6 @@ const EventDetailsModal = () => {
                                 onClick={async () => {
                                     if (event.status !== 'Registered') {
                                         if (confirm("Mark this event as registered? This will track it as 'Participating'.")) {
-                                            const { updateTeamEventStatus } = await import('../db');
                                             await updateTeamEventStatus(event.serverId || event.id, { status: 'Registered' });
                                         }
                                     }
@@ -527,6 +523,31 @@ const EventDetailsModal = () => {
                                 <ExternalLink size={12} />
                             </a>
                         )}
+
+                        {/* Calendar Integration */}
+                        <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800">
+                            <h4 className="text-[7px] font-black uppercase tracking-[0.2em] text-slate-400 mb-2 flex items-center gap-1.5">
+                                <Calendar size={10} /> Sync Event Schedule
+                            </h4>
+                            <div className="flex gap-2">
+                                <a
+                                    href={getGoogleCalendarUrl(event)}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="flex-1 h-9 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg flex items-center justify-center gap-1.5 hover:bg-slate-50 dark:hover:bg-slate-800 text-[8px] font-black uppercase tracking-widest text-slate-700 dark:text-slate-300 transition-all"
+                                >
+                                    <Globe size={12} className="text-indigo-500" />
+                                    Google Calendar
+                                </a>
+                                <button
+                                    onClick={() => downloadIcsFile(event)}
+                                    className="flex-1 h-9 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg flex items-center justify-center gap-1.5 hover:bg-slate-50 dark:hover:bg-slate-800 text-[8px] font-black uppercase tracking-widest text-slate-700 dark:text-slate-300 transition-all"
+                                >
+                                    <Download size={12} className="text-indigo-500" />
+                                    Export .ics
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
 

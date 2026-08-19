@@ -3,7 +3,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../store';
-import { db, EventType, getUserPrizeSummary } from '../db';
+import { db, EventType, getUserPrizeSummary, getMergedEvents } from '../db';
 import EventCard from './EventCard';
 import { BarChart3, TrendingUp, Award, DollarSign, Target, Zap, Globe, Map, Shield } from 'lucide-react';
 import { cn } from '../utils';
@@ -38,7 +38,7 @@ const Analytics = () => {
 
     const teamId = useAppStore((state) => state.teamId);
     const events = useLiveQuery(async () => {
-        const { getMergedEvents } = await import('../db');
+        
         return await getMergedEvents();
     }, [teamId]) || [];
     const [modalConfig, setModalConfig] = useState({ isOpen: false, type: null, title: '' });

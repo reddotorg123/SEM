@@ -4,7 +4,7 @@ import { useAppStore } from '../store';
 import { addEvent } from '../db';
 import { parseDate } from '../csvUtils';
 import { X, Upload, Image as ImageIcon, Sparkles, Wand2, Info, MapPin, Calendar, Trophy, Users, Globe, Terminal, ShieldCheck, Check, Save, Plus, Clock } from 'lucide-react';
-import { cn } from '../utils';
+import { cn, parseOcrTextHeuristics } from '../utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
@@ -116,13 +116,20 @@ const AddEventModal = () => {
 
             const textLower = extractedText.toLowerCase();
             const lines = extractedText.split('\n').map(l => l.trim()).filter(l => l.length > 5);
+            const parsedResults = parseOcrTextHeuristics(extractedText);
 
             setFormData(prev => ({
                 ...prev,
                 eventName: lines[0] || prev.eventName,
-                prizeAmount: extractedText.match(/(?:(?:INR|₹|Prize|Worth)\.?\s*)([0-9,]+)/i)?.[1].replace(/,/g, '') || prev.prizeAmount,
-                description: `AI ANALYZED: ${extractedText.substring(0, 100)}...`,
-                eventType: textLower.includes('hack') ? [EventType.HACKATHON] : [EventType.CONTEST]
+                description: `AI ANALYZED:\n${extractedText.substring(0, 500)}...`,
+                eventType: textLower.includes('hack') ? [EventType.HACKATHON] : (textLower.includes('work') ? [EventType.WORKSHOP] : (textLower.includes('paper') ? [EventType.PAPER_PRESENTATION] : [EventType.CONTEST])),
+                prizeAmount: parsedResults.prizeAmount !== undefined ? String(parsedResults.prizeAmount) : prev.prizeAmount,
+                registrationFee: parsedResults.registrationFee !== undefined ? String(parsedResults.registrationFee) : prev.registrationFee,
+                registrationDeadline: parsedResults.registrationDeadline || prev.registrationDeadline,
+                startDate: parsedResults.startDate || prev.startDate,
+                endDate: parsedResults.endDate || prev.endDate,
+                website: parsedResults.website || prev.website,
+                registrationLink: parsedResults.registrationLink || prev.registrationLink
             }));
 
             alert('SYSTEM: Neural Protocol Complete. Data successfully injected into form matrix.');

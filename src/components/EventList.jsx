@@ -1,7 +1,7 @@
 import React, { useMemo, useCallback, useState, useEffect, memo } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { motion, AnimatePresence } from 'framer-motion';
-import { db, EventType, EventStatus, getAllEvents } from '../db';
+import { db, EventType, EventStatus, getAllEvents, getMergedEvents } from '../db';
 import { useAppStore } from '../store';
 import EventCard from './EventCard';
 import { Search, Filter, SortDesc, SlidersHorizontal, ArrowUpDown, Table as TableIcon, LayoutGrid, FileSpreadsheet, ChevronRight, MapPin, Calendar, Clock, Trophy, Zap, ArrowUp, Heart, Terminal, Cpu, Database, Binary, Shield, ExternalLink, Globe } from 'lucide-react';
@@ -171,7 +171,6 @@ const EventList = () => {
     const scrollToTop = () => window.scrollTo({ top: 0, behavior: 'smooth' });
 
     const events = useLiveQuery(async () => {
-        const { getMergedEvents } = await import('../db');
         return await getMergedEvents();
     }, [filters.showShortlisted]); 
 
