@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import DOMPurify from 'dompurify';
 import { useAppStore } from '../store';
 import { addEvent } from '../db';
 import { parseDate } from '../csvUtils';
@@ -154,6 +155,7 @@ const AddEventModal = () => {
             
             const eventData = {
                 ...formData,
+                description: DOMPurify.sanitize(formData.description),
                 eventType: actualEventTypes,
                 prizeAmount: parseFloat(formData.prizeAmount) || 0,
                 prizeWon: parseFloat(formData.prizeWon) || 0,

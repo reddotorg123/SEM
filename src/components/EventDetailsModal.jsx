@@ -1,4 +1,5 @@
 import React, { useRef, useState, useEffect, useMemo } from 'react';
+import DOMPurify from 'dompurify';
 import ReactDOM from 'react-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, updateEvent, deleteEvent, EventStatus, setUserEventStat, getUserEventStat } from '../db';
@@ -458,7 +459,7 @@ const EventDetailsModal = () => {
                             {event.description ? (
                                 <div 
                                     className="text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed font-medium whitespace-pre-wrap prose prose-sm max-w-none dark:prose-invert prose-p:my-1"
-                                    dangerouslySetInnerHTML={{ __html: event.description }} 
+                                    dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(event.description) }} 
                                 />
                             ) : (
                                 <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed font-medium">

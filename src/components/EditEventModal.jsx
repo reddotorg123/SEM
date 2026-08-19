@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import DOMPurify from 'dompurify';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
 import { useAppStore } from '../store';
@@ -174,6 +175,7 @@ const EditEventModal = () => {
 
             const updates = {
                 ...formData,
+                description: DOMPurify.sanitize(formData.description),
                 eventType: actualEventTypes,
                 prizeAmount: parseFloat(formData.prizeAmount) || 0,
                 prizeWon: parseFloat(formData.prizeWon) || 0,
