@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
+import ReactQuill from 'react-quill';
+import 'react-quill/dist/quill.snow.css';
 import { useAppStore } from '../store';
 import { db, updateEvent, EventType, EventStatus } from '../db';
 import { X, Save, Sparkles, Image as ImageIcon, Link as LinkIcon, Calendar, Trophy, MapPin, Users, Phone, User, Info, Check, Clock } from 'lucide-react';
@@ -402,8 +404,24 @@ const EditEventModal = () => {
                                     <textarea name="eligibility" value={formData.eligibility} onChange={handleChange} rows="2" className="input-premium pt-4" />
                                 </div>
                                 <div className="form-group">
-                                    <label className="label-premium">Full Event Description</label>
-                                    <textarea name="description" value={formData.description} onChange={handleChange} rows="5" className="input-premium pt-4" />
+                                    <label className="label-premium">Full Event Description (Rich Text Supported)</label>
+                                    <div className="bg-white text-slate-900 rounded-xl overflow-hidden border border-slate-200">
+                                        <ReactQuill 
+                                            theme="snow" 
+                                            value={formData.description} 
+                                            onChange={(val) => setFormData(prev => ({ ...prev, description: val }))}
+                                            placeholder="Brief about the event... (Paste with formatting!)"
+                                            modules={{
+                                                toolbar: [
+                                                    [{ 'header': [1, 2, 3, false] }],
+                                                    ['bold', 'italic', 'underline', 'strike'],
+                                                    [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+                                                    [{ 'color': [] }, { 'background': [] }],
+                                                    ['clean']
+                                                ]
+                                            }}
+                                        />
+                                    </div>
                                 </div>
                             </div>
                         )}
