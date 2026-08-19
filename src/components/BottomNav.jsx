@@ -62,7 +62,7 @@ const BottomNav = () => {
                         return (
                             <button
                                 key={item.label}
-                                onClick={item.onClick}
+                                onClick={() => { if (navigator.vibrate) navigator.vibrate(40); item.onClick?.(); }}
                                 className="flex flex-col items-center justify-center gap-0.5 flex-1 min-w-0 relative transition-colors text-slate-400"
                             >
                                 {Content}
@@ -74,6 +74,7 @@ const BottomNav = () => {
                         <Link
                             key={item.path}
                             to={item.path}
+                            onClick={() => { if (navigator.vibrate) navigator.vibrate(40); }}
                             className={cn(
                                 "flex flex-col items-center justify-center gap-0.5 flex-1 min-w-0 relative transition-colors",
                                 isActive

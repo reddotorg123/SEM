@@ -105,10 +105,9 @@ export const requestFCMToken = async (uid) => {
     try {
         // VAPID Key from Firebase Console -> Settings -> Cloud Messaging -> Web Push certificates
         // User will need to provide this for background notifications when app is closed.
-        const token = await getToken(messaging, {
-            // NOTE: Public VAPID key would go here. For now it uses default if already configured in project.
-            // vapidKey: 'YOUR_VAPID_KEY' 
-        });
+        const vapidKey = import.meta.env.VITE_VAPID_KEY;
+        const tokenOptions = vapidKey ? { vapidKey } : {};
+        const token = await getToken(messaging, tokenOptions);
 
         if (token) {
             console.log("📍 FCM Token received:", token);
@@ -635,10 +634,14 @@ export const disbandTeam = async (leaderId) => {
     
     members.forEach(member => {
         const memberRef = doc(db, "users", member.id);
+        const preservedRole = (member.role === 'admin' || member.role === 'event_manager' || member.role === 'subscriber') 
+            ? member.role 
+            : 'public';
+
         batch.update(memberRef, {
             teamId: member.id, // return to their own ID
             position: 'Explorer',
-            role: (member.role === 'admin' || member.role === 'event_manager') ? member.role : 'public'
+            role: preservedRole
         });
     });
 
@@ -804,4 +807,37 @@ export const updateUserStats = async (uid, statsData) => {
     } catch (error) {
         console.error("[Firebase] Failed to sync user stats:", error);
     }
+};
+/**
+ * FIRESTORE: Save a user's personal prize/stat for a specific event.
+ * Path: users/{userId}/eventStats/{eventId}
+ */
+export const saveUserEventStat = async (userId, eventId, data) => {
+    if (!db || !userId || !eventId) return;
+    try {
+        const statRef = doc(db, 'users', userId, 'eventStats', eventId);
+        await setDoc(statRef, {
+            ...data,
+            userId,
+            eventId,
+            updatedAt: new Date().toISOString()
+        }, { merge: true });
+    } catch (e) {
+        console.error('[Firebase] saveUserEventStat failed:', e);
+    }
+};
+
+/**
+ * FIRESTORE: Subscribe to a user's personal event stats (real-time).
+ */
+export const subscribeToUserEventStats = (userId, callback) => {
+    if (!db || !userId) return () => {};
+    const statsRef = collection(db, 'users', userId, 'eventStats');
+    return onSnapshot(statsRef, (snapshot) => {
+        const stats = {};
+        snapshot.docs.forEach(d => { stats[d.id] = d.data(); });
+        callback(stats);
+    }, (err) => {
+        console.error('[Firebase] subscribeToUserEventStats failed:', err);
+    });
 };

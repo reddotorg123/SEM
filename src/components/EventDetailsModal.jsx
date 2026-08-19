@@ -1,12 +1,14 @@
 import React, { useRef, useState, useEffect, useMemo } from 'react';
 import ReactDOM from 'react-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { db, updateEvent, deleteEvent, EventStatus } from '../db';
+import { db, updateEvent, deleteEvent, EventStatus, setUserEventStat, getUserEventStat } from '../db';
 import { useAppStore } from '../store';
 import { X, Calendar, MapPin, Trophy, Users, ExternalLink, Trash2, Edit, Clock, Sparkles, Heart, Phone, Info, Globe, Shield, ShieldCheck, Zap, Share2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn, resolveImageUrl, getDefaultPoster } from '../utils';
 import { motion, AnimatePresence } from 'framer-motion';
+import { saveUserEventStat } from '../services/firebase';
+import { IndianRupee } from 'lucide-react';
 
 // Safe Formatter
 const safeFormat = (date, formatStr) => {
@@ -162,6 +164,32 @@ const EventDetailsModal = () => {
     const preferences = useAppStore((state) => state.preferences);
     const modalContentRef = useRef(null);
     const [isZoomed, setIsZoomed] = useState(false);
+    const [myPrize, setMyPrize] = useState('');
+    const [prizeLoaded, setPrizeLoaded] = useState(false);
+
+    // Load personal prize stat when event changes
+    useEffect(() => {
+        if (!event?.serverId && !event?.id) return;
+        const uid = useAppStore.getState().userProfile?.uid;
+        if (!uid) return;
+        const eventId = event.serverId || String(event.id);
+        setPrizeLoaded(false);
+        getUserEventStat(uid, eventId).then(stat => {
+            setMyPrize(stat?.prizeWon != null ? String(stat.prizeWon) : '');
+            setPrizeLoaded(true);
+        });
+    }, [event?.serverId, event?.id]);
+
+    // Save personal prize on blur
+    const handleMyPrizeSave = async () => {
+        const uid = useAppStore.getState().userProfile?.uid;
+        if (!uid) return;
+        const eventId = event.serverId || String(event.id);
+        const amount = parseFloat(myPrize) || 0;
+        await setUserEventStat(uid, eventId, { prizeWon: amount });
+        // Also sync to Firestore
+        try { await saveUserEventStat(uid, eventId, { prizeWon: amount }); } catch(_) {}
+    };
 
     useEffect(() => {
         // Only lock scroll if the modal is open AND we have event data to show

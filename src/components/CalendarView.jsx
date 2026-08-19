@@ -13,9 +13,11 @@ import {
     startOfWeek,
     endOfWeek,
     addMonths,
-    subMonths
+    subMonths,
+    addWeeks,
+    subWeeks
 } from 'date-fns';
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Clock, Trophy } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Clock, Trophy, Download, Grid, ListFilter } from 'lucide-react';
 import { cn } from '../utils';
 
 const CalendarView = () => {
@@ -27,18 +29,24 @@ const CalendarView = () => {
     const [currentDate, setCurrentDate] = useState(new Date());
     const [selectedDate, setSelectedDate] = useState(new Date());
     const [direction, setDirection] = useState(0);
+    const [viewMode, setViewMode] = useState('month'); // 'month' or 'week'
 
     const setSelectedEvent = useAppStore((state) => state.setSelectedEvent);
     const openModal = useAppStore((state) => state.openModal);
 
     const calendarDays = useMemo(() => {
-        const monthStart = startOfMonth(currentDate);
-        const monthEnd = endOfMonth(currentDate);
-        const calendarStart = startOfWeek(monthStart);
-        const calendarEnd = endOfWeek(monthEnd);
-
-        return eachDayOfInterval({ start: calendarStart, end: calendarEnd });
-    }, [currentDate]);
+        if (viewMode === 'week') {
+            const calendarStart = startOfWeek(currentDate);
+            const calendarEnd = endOfWeek(currentDate);
+            return eachDayOfInterval({ start: calendarStart, end: calendarEnd });
+        } else {
+            const monthStart = startOfMonth(currentDate);
+            const monthEnd = endOfMonth(currentDate);
+            const calendarStart = startOfWeek(monthStart);
+            const calendarEnd = endOfWeek(monthEnd);
+            return eachDayOfInterval({ start: calendarStart, end: calendarEnd });
+        }
+    }, [currentDate, viewMode]);
 
     const getEventsForDay = (day) => {
         if (!events) return [];
@@ -61,14 +69,70 @@ const CalendarView = () => {
 
     const selectedDayEvents = useMemo(() => getEventsForDay(selectedDate), [selectedDate, events]);
 
-    const previousMonth = () => {
+    const previousPeriod = () => {
         setDirection(-1);
-        setCurrentDate(subMonths(currentDate, 1));
+        if (viewMode === 'week') {
+            setCurrentDate(subWeeks(currentDate, 1));
+        } else {
+            setCurrentDate(subMonths(currentDate, 1));
+        }
     };
 
-    const nextMonth = () => {
+    const nextPeriod = () => {
         setDirection(1);
-        setCurrentDate(addMonths(currentDate, 1));
+        if (viewMode === 'week') {
+            setCurrentDate(addWeeks(currentDate, 1));
+        } else {
+            setCurrentDate(addMonths(currentDate, 1));
+        }
+    };
+
+    const exportToICS = () => {
+        if (!events || events.length === 0) {
+            alert("No events to export.");
+            return;
+        }
+
+        let icsContent = [
+            "BEGIN:VCALENDAR",
+            "VERSION:2.0",
+            "PRODID:-//SEM Student Event Manager//EN",
+            "CALSCALE:GREGORIAN",
+            "METHOD:PUBLISH"
+        ];
+
+        events.forEach(event => {
+            const start = event.startDate ? new Date(event.startDate) : null;
+            const end = event.endDate ? new Date(event.endDate) : (start ? new Date(start.getTime() + 2 * 60 * 60 * 1000) : null);
+            if (!start || isNaN(start.getTime())) return;
+
+            const formatDateICS = (date) => {
+                return date.toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
+            };
+
+            icsContent.push("BEGIN:VEVENT");
+            icsContent.push(`UID:event-${event.id || Math.random()}@sem.app`);
+            icsContent.push(`DTSTAMP:${formatDateICS(new Date())}`);
+            icsContent.push(`DTSTART:${formatDateICS(start)}`);
+            if (end && !isNaN(end.getTime())) {
+                icsContent.push(`DTEND:${formatDateICS(end)}`);
+            }
+            icsContent.push(`SUMMARY:${event.eventName || 'Untitled Event'}`);
+            icsContent.push(`DESCRIPTION:${(event.description || '').replace(/<[^>]*>/g, '').replace(/\n/g, '\\n')}`);
+            icsContent.push(`LOCATION:${event.isOnline ? 'Online' : (event.location || 'TBD')}`);
+            icsContent.push(`ORGANIZER;CN=${event.collegeName || 'Organizer'}:MAILTO:no-reply@sem.app`);
+            icsContent.push("END:VEVENT");
+        });
+
+        icsContent.push("END:VCALENDAR");
+
+        const blob = new Blob([icsContent.join("\r\n")], { type: "text/calendar;charset=utf-8" });
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(blob);
+        link.download = `sem_events_${format(new Date(), 'yyyyMMdd')}.ics`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
     };
 
     const variants = {
@@ -79,20 +143,65 @@ const CalendarView = () => {
 
     return (
         <div className="pb-20">
-            <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
-                <h1 className="text-4xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-                    Event <span className="text-indigo-600">Timeline</span>
-                </h1>
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between mb-8 gap-4">
+                <div>
+                    <h1 className="text-4xl font-extrabold text-slate-900 dark:text-white tracking-tight">
+                        Event <span className="text-indigo-600">Timeline</span>
+                    </h1>
+                    <p className="text-sm font-semibold text-slate-500 mt-1 uppercase tracking-wider">
+                        Tactical scheduler & planner
+                    </p>
+                </div>
 
-                <div className="flex items-center gap-4 bg-white dark:bg-slate-900 p-2 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800">
-                    <button onClick={previousMonth} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors text-slate-600 dark:text-slate-400">
-                        <ChevronLeft size={20} />
-                    </button>
-                    <h2 className="text-lg font-bold text-slate-900 dark:text-white min-w-[140px] text-center">
-                        {format(currentDate, 'MMMM yyyy')}
-                    </h2>
-                    <button onClick={nextMonth} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors text-slate-600 dark:text-slate-400">
-                        <ChevronRight size={20} />
+                <div className="flex flex-wrap items-center gap-3">
+                    {/* View Switcher */}
+                    <div className="flex items-center bg-slate-100 dark:bg-slate-800/80 p-1 rounded-xl border border-slate-200/50 dark:border-slate-700/50">
+                        <button 
+                            onClick={() => setViewMode('month')} 
+                            className={cn(
+                                "px-3 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider transition-all",
+                                viewMode === 'month' 
+                                    ? "bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-sm" 
+                                    : "text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
+                            )}
+                        >
+                            Month
+                        </button>
+                        <button 
+                            onClick={() => setViewMode('week')} 
+                            className={cn(
+                                "px-3 py-1.5 rounded-lg text-xs font-black uppercase tracking-wider transition-all",
+                                viewMode === 'week' 
+                                    ? "bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-sm" 
+                                    : "text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
+                            )}
+                        >
+                            Week
+                        </button>
+                    </div>
+
+                    {/* Navigation controls */}
+                    <div className="flex items-center gap-2 bg-white dark:bg-slate-900 p-1.5 rounded-xl shadow-sm border border-slate-100 dark:border-slate-800">
+                        <button onClick={previousPeriod} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors text-slate-600 dark:text-slate-400">
+                            <ChevronLeft size={16} />
+                        </button>
+                        <h2 className="text-xs font-black text-slate-900 dark:text-white min-w-[120px] text-center uppercase tracking-widest">
+                            {viewMode === 'week' 
+                                ? `Week of ${format(startOfWeek(currentDate), 'MMM dd')}` 
+                                : format(currentDate, 'MMMM yyyy')}
+                        </h2>
+                        <button onClick={nextPeriod} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors text-slate-600 dark:text-slate-400">
+                            <ChevronRight size={16} />
+                        </button>
+                    </div>
+
+                    {/* ICS Export Button */}
+                    <button 
+                        onClick={exportToICS}
+                        className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 text-white rounded-xl font-black text-xs uppercase tracking-widest hover:brightness-110 active:scale-95 transition-all shadow-md shadow-indigo-600/10"
+                    >
+                        <Download size={14} />
+                        Export ICS
                     </button>
                 </div>
             </div>
@@ -104,16 +213,19 @@ const CalendarView = () => {
                         <div className="min-w-[500px] sm:min-w-0">
                             <div className="grid grid-cols-7 border-b border-slate-100 dark:border-slate-800">
                                 {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-                                    <div key={day} className="py-4 text-center text-[10px] font-black uppercase tracking-widest text-slate-400">
+                                    <div key={day} className="py-4 text-center text-[10px] font-black uppercase tracking-widest text-slate-400 font-mono">
                                         {day}
                                     </div>
                                 ))}
                             </div>
 
-                            <div className="relative overflow-hidden min-h-[500px]">
+                            <div className={cn(
+                                "relative overflow-hidden transition-all duration-300",
+                                viewMode === 'week' ? "min-h-[140px]" : "min-h-[500px]"
+                            )}>
                                 <AnimatePresence initial={false} custom={direction} mode="wait">
                                     <motion.div
-                                        key={currentDate.toString()}
+                                        key={currentDate.toString() + viewMode}
                                         custom={direction}
                                         variants={variants}
                                         initial="enter"
@@ -133,8 +245,9 @@ const CalendarView = () => {
                                                     key={day.toString()}
                                                     onClick={() => setSelectedDate(day)}
                                                     className={cn(
-                                                        "min-h-[100px] p-2 border-r border-b border-slate-100 dark:border-slate-800 transition-all cursor-pointer group",
-                                                        !isCurrentMonth && "bg-slate-50/50 dark:bg-slate-950/20",
+                                                        "p-2 border-r border-b border-slate-100 dark:border-slate-800 transition-all cursor-pointer group",
+                                                        viewMode === 'week' ? "min-h-[120px]" : "min-h-[100px]",
+                                                        !isCurrentMonth && viewMode !== 'week' && "bg-slate-50/50 dark:bg-slate-950/20",
                                                         today && "bg-indigo-50/30 dark:bg-indigo-900/10",
                                                         isSelected && "ring-2 ring-inset ring-indigo-500 bg-indigo-50/50 dark:bg-indigo-500/10"
                                                     )}
@@ -144,7 +257,7 @@ const CalendarView = () => {
                                                             "flex items-center justify-center w-7 h-7 text-xs font-bold rounded-lg transition-all",
                                                             today ? "bg-indigo-600 text-white shadow-lg shadow-indigo-500/30" :
                                                                 isSelected ? "bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300" :
-                                                                    isCurrentMonth ? "text-slate-700 dark:text-slate-300 group-hover:bg-slate-100 dark:group-hover:bg-slate-800" :
+                                                                    (isCurrentMonth || viewMode === 'week') ? "text-slate-700 dark:text-slate-300 group-hover:bg-slate-100 dark:group-hover:bg-slate-800" :
                                                                         "text-slate-300 dark:text-slate-700"
                                                         )}>
                                                             {format(day, 'd')}
@@ -160,12 +273,12 @@ const CalendarView = () => {
                                                                     isDeadline ? "bg-rose-100/80 text-rose-700 dark:bg-rose-500/20 dark:text-rose-400" :
                                                                         "bg-indigo-100/80 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-400"
                                                                 )}>
-                                                                    {isDeadline && "⚠️ "}{event.eventName}
+                                                                    {isDeadline && "?? "}{event.eventName}
                                                                 </div>
                                                             );
                                                         })}
                                                         {dayEvents.length > 2 && (
-                                                            <div className="text-[9px] text-slate-400 font-black pl-1">
+                                                            <div className="text-[9px] text-slate-400 font-black pl-1 font-mono">
                                                                 +{dayEvents.length - 2} MORE
                                                             </div>
                                                         )}
@@ -188,8 +301,8 @@ const CalendarView = () => {
                                 <CalendarIcon size={20} />
                             </div>
                             <div>
-                                <h3 className="font-black text-slate-900 dark:text-white uppercase tracking-tighter">Day Schedule</h3>
-                                <p className="text-xs text-slate-500 font-bold">{format(selectedDate, 'EEEE, MMMM dd')}</p>
+                                <h3 className="font-black text-slate-900 dark:text-white uppercase tracking-tighter leading-tight">Day Schedule</h3>
+                                <p className="text-xs text-slate-500 font-bold mt-0.5">{format(selectedDate, 'EEEE, MMMM dd')}</p>
                             </div>
                         </div>
 
@@ -235,12 +348,12 @@ const CalendarView = () => {
                         <h4 className="font-black text-xs uppercase tracking-[0.2em] mb-3 opacity-80">Quick Legend</h4>
                         <div className="space-y-3">
                             <div className="flex items-center gap-3">
-                                <div className="w-2 h-2 rounded-full bg-white" />
-                                <span className="text-[10px] font-bold uppercase">Standard Event</span>
+                                <div className="w-2.5 h-2.5 rounded-full bg-white" />
+                                <span className="text-[10px] font-black uppercase tracking-widest">Standard Event</span>
                             </div>
                             <div className="flex items-center gap-3">
-                                <div className="w-2 h-2 rounded-full bg-rose-400 shadow-[0_0_8px_rgba(251,113,133,0.8)]" />
-                                <span className="text-[10px] font-bold uppercase">Critical Deadline</span>
+                                <div className="w-2.5 h-2.5 rounded-full bg-rose-400 shadow-[0_0_8px_rgba(251,113,133,0.8)]" />
+                                <span className="text-[10px] font-black uppercase tracking-widest">Critical Deadline</span>
                             </div>
                         </div>
                     </div>
@@ -251,4 +364,3 @@ const CalendarView = () => {
 };
 
 export default CalendarView;
-

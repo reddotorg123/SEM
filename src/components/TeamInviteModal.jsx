@@ -24,6 +24,9 @@ const TeamInviteModal = () => {
     const [addStatus, setAddStatus] = useState({ type: '', msg: '' });
     const [joinRequests, setJoinRequests] = useState([]);
 
+    const currentTeamId = teamId || auth?.currentUser?.uid;
+    const isTeamLeader = user && currentTeamId === user.uid;
+
     // Load team members
     const fetchMembers = async () => {
         const currentTeamId = teamId || auth?.currentUser?.uid;
@@ -40,6 +43,9 @@ const TeamInviteModal = () => {
     };
 
     useEffect(() => {
+        let isSubscribed = true;
+        let unsubscribeFn = null;
+
         if (isOpen && (teamId || auth?.currentUser)) {
             fetchMembers();
             // Get invite code (Always from the team owner's profile)
@@ -49,17 +55,23 @@ const TeamInviteModal = () => {
                 getDoc(userRef).then(docSnap => {
                     if (docSnap.exists()) {
                         const data = docSnap.data();
-                        if (data.inviteCode) setInviteCode(data.inviteCode);
+                        if (data.inviteCode && isSubscribed) setInviteCode(data.inviteCode);
                     }
                 });
 
                 // Real-time subscribe to join requests
                 import('../services/firebase').then(({ subscribeToTeamRequests }) => {
-                    const unsubscribe = subscribeToTeamRequests(ownerId, setJoinRequests);
-                    return () => unsubscribe && unsubscribe();
+                    if (isSubscribed) {
+                        unsubscribeFn = subscribeToTeamRequests(ownerId, setJoinRequests);
+                    }
                 });
             }
         }
+
+        return () => {
+            isSubscribed = false;
+            if (unsubscribeFn) unsubscribeFn();
+        };
     }, [isOpen, teamId]);
 
     const generateLink = async () => {
@@ -82,6 +94,12 @@ const TeamInviteModal = () => {
     const handleAddMember = async (e) => {
         e.preventDefault();
         if (!memberEmail) return;
+
+        if (members.length >= 10) {
+            setAddStatus({ type: 'error', msg: 'Tactical Unit is at maximum capacity (10/10).' });
+            return;
+        }
+
         setIsAdding(true);
         setAddStatus({ type: '', msg: '' });
 
@@ -127,11 +145,20 @@ const TeamInviteModal = () => {
     const handleRemoveMember = async (uid) => {
         if (!window.confirm("Remove this unit from your Tactical Unit?")) return;
         try {
-            await updateDoc(doc(db, "users", uid), {
-                teamId: uid,
-                role: 'public'
-            });
-            fetchMembers();
+            const userSnap = await getDoc(doc(db, "users", uid));
+            if (userSnap.exists()) {
+                const userData = userSnap.data();
+                const preservedRole = (userData.role === 'admin' || userData.role === 'event_manager' || userData.role === 'subscriber') 
+                    ? userData.role 
+                    : 'public';
+
+                await updateDoc(doc(db, "users", uid), {
+                    teamId: uid,
+                    role: preservedRole,
+                    position: 'Explorer'
+                });
+                fetchMembers();
+            }
         } catch (error) {
             console.error(error);
         }
@@ -281,7 +308,7 @@ const TeamInviteModal = () => {
                                 )}
 
                                 {/* Induction Requests (Approvals) */}
-                                {joinRequests.length > 0 && (
+                                {(joinRequests.length > 0 && isTeamLeader) && (
                                     <div className="space-y-4 animate-in fade-in slide-in-from-top-4">
                                         <h3 className="text-[10px] font-black uppercase tracking-widest text-amber-500 flex items-center gap-2">
                                             <LogIn size={14} /> PENDING INDUCTIONS ({joinRequests.length})
@@ -341,7 +368,8 @@ const TeamInviteModal = () => {
                                                             <select 
                                                                 value={member.position || 'Explorer'} 
                                                                 onChange={(e) => handleUpdatePosition(member.id, e.target.value)}
-                                                                className="pl-8 pr-4 py-2 bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 rounded-xl text-[9px] font-black uppercase tracking-widest outline-none focus:border-indigo-600 appearance-none min-w-[140px]"
+                                                                disabled={!isTeamLeader}
+                                                                className={`pl-8 pr-4 py-2 bg-slate-50 dark:bg-slate-900 border-2 border-slate-100 rounded-xl text-[9px] font-black uppercase tracking-widest outline-none focus:border-indigo-600 appearance-none min-w-[140px] ${!isTeamLeader ? 'opacity-70 cursor-not-allowed' : ''}`}
                                                             >
                                                                 <option value="Explorer">Operative</option>
                                                                 <option value="Leader">Team Leader</option>
@@ -351,12 +379,14 @@ const TeamInviteModal = () => {
                                                                 <option value="Manager">Manager</option>
                                                             </select>
                                                         </div>
-                                                        <button 
-                                                            onClick={() => handleRemoveMember(member.id)}
-                                                            className="w-10 h-10 bg-rose-50 text-rose-400 hover:bg-rose-500 hover:text-white rounded-xl flex items-center justify-center border border-rose-100 transition-all opacity-0 group-hover:opacity-100"
-                                                        >
-                                                            <Trash2 size={16} />
-                                                        </button>
+                                                        {isTeamLeader && member.id !== user.uid && (
+                                                            <button 
+                                                                onClick={() => handleRemoveMember(member.id)}
+                                                                className="w-10 h-10 bg-rose-50 text-rose-400 hover:bg-rose-500 hover:text-white rounded-xl flex items-center justify-center border border-rose-100 transition-all opacity-0 group-hover:opacity-100"
+                                                            >
+                                                                <Trash2 size={16} />
+                                                            </button>
+                                                        )}
                                                     </div>
                                                 </div>
                                             ))}
@@ -383,7 +413,7 @@ const TeamInviteModal = () => {
                                             {copied ? 'Captured' : 'Capture Link'}
                                         </button>
                                     </div>
-                                    {!inviteCode && (
+                                    {(!inviteCode && isTeamLeader) && (
                                         <button onClick={generateLink} disabled={isGenerating} className="mt-4 w-full text-[9px] font-black uppercase tracking-widest text-indigo-200 hover:text-white transition-all underline underline-offset-4">Synchronize Network Code</button>
                                     )}
                                 </div>

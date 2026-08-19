@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
     Users, 
     Calendar, 
-    Shield, 
+    Bell, Shield, 
     CheckCircle2, 
     XCircle, 
     Clock, 
@@ -56,6 +56,8 @@ const AdminPanel = () => {
     // Data states
     const [users, setUsers] = useState([]);
     const [payments, setPayments] = useState([]);
+    const [teamRequests, setTeamRequests] = useState([]);
+    const [teamMembers, setTeamMembers] = useState([]);
     const teamId = useAppStore((state) => state.teamId);
     const localEvents = useLiveQuery(async () => {
         const { getMergedEvents } = await import('../db');
@@ -96,6 +98,23 @@ const AdminPanel = () => {
 
         if (activeTab === 'users' || activeTab === 'payments') {
             fetchData();
+        } else if (activeTab === 'members') {
+            const loadMembers = async () => {
+                setIsLoading(true);
+                try {
+                    const { getTeamMembers, subscribeToTeamRequests, auth } = await import('../services/firebase');
+                    if (auth?.currentUser) {
+                        const members = await getTeamMembers(auth.currentUser.uid);
+                        setTeamMembers(members);
+                        unsubscribePayments = subscribeToTeamRequests(auth.currentUser.uid, setTeamRequests) || (() => {});
+                    }
+                } catch (err) {
+                    console.error('Failed to load team data:', err);
+                } finally {
+                    setIsLoading(false);
+                }
+            };
+            loadMembers();
         } else {
             setIsLoading(false);
         }
@@ -153,10 +172,27 @@ const AdminPanel = () => {
         }
     };
 
+    const handleTeamRequestAction = async (req, action) => {
+        try {
+            if (action === 'approve') {
+                const { approveJoinTeam } = await import('../services/firebase');
+                await approveJoinTeam(req.id, req.userId, req.teamId);
+                setTeamRequests(prev => prev.filter(r => r.id !== req.id));
+            } else {
+                const { rejectJoinTeam } = await import('../services/firebase');
+                await rejectJoinTeam(req.id);
+                setTeamRequests(prev => prev.filter(r => r.id !== req.id));
+            }
+        } catch (err) {
+            console.error('Team request action failed:', err);
+        }
+    };
+
     const tabs = [
         { id: 'events', label: 'Matrix Control', icon: Calendar, description: 'Manage global events & data streams' },
         { id: 'users', label: 'Unit Directory', icon: Users, description: 'User roles & system permissions' },
-        { id: 'payments', label: 'Financial Grid', icon: CreditCard, description: 'Manual verification & subscriptions' }
+        { id: 'payments', label: 'Financial Grid', icon: CreditCard, description: 'Manual verification & subscriptions' },
+        { id: 'members', label: 'Team Network', icon: Users, description: 'Members, join requests & team stats' }
     ];
 
     return (

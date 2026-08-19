@@ -123,6 +123,10 @@ function App() {
     const cloudProvider = useAppStore((state) => state.cloudProvider);
     const userRole = useAppStore((state) => state.userRole);
     const teamId = useAppStore((state) => state.teamId);
+    const hasAcceptedTerms = useAppStore((state) => state.hasAcceptedTerms);
+    const hasSeenTutorial = useAppStore((state) => state.hasSeenTutorial);
+    const setHasSeenTutorial = useAppStore((state) => state.setHasSeenTutorial);
+    const openModal = useAppStore((state) => state.openModal);
 
     // Local loading states
     const [isLoading, setIsLoading] = useState(true);
@@ -328,7 +332,7 @@ function App() {
  * 🛰️ ROUTES WRAPPER
  * This component is inside the Router and can use useLocation.
  */
-function RoutesWrapper({ user, isLoading }) {
+const RoutesWrapper = React.memo(function RoutesWrapper({ user, isLoading }) {
     const location = useLocation();
     const isInviteUrl = location.pathname.startsWith('/invite/');
 
@@ -378,6 +382,6 @@ function RoutesWrapper({ user, isLoading }) {
             </main>
         </div>
     );
-}
+});
 
 export default App;

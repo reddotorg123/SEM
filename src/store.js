@@ -144,6 +144,9 @@ export const useAppStore = create(
             hasAcceptedTerms: false,
             setHasAcceptedTerms: (val) => set({ hasAcceptedTerms: val }),
 
+            hasSeenTutorial: false,
+            setHasSeenTutorial: (val) => set({ hasSeenTutorial: val }),
+
             // --- MODAL CONTROLLERS ---
             modals: {
                 addEvent: false,
@@ -203,6 +206,7 @@ export const useAppStore = create(
                 filters: state.filters,
                 viewMode: state.viewMode,
                 hasAcceptedTerms: state.hasAcceptedTerms,
+                hasSeenTutorial: state.hasSeenTutorial,
             })
         }
     )

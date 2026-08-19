@@ -298,3 +298,41 @@
 .animate-bounce-subtle {
     animation: bounce-subtle 2s ease-in-out infinite;
 }
+/* --------------------------------------------------
+   MOBILE EXPERIENCE IMPROVEMENTS
+   Eliminates 300ms tap delay and sets minimum tap targets
+   -------------------------------------------------- */
+
+/* Eliminate 300ms tap delay on interactive elements */
+button,
+a,
+[role="button"],
+input[type="submit"],
+input[type="button"],
+label {
+    touch-action: manipulation;
+}
+
+/* Minimum 44×44px tap targets for accessibility (WCAG 2.5.5) */
+.tap-target {
+    min-height: 44px;
+    min-width: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Prevent text selection on UI elements during fast taps */
+nav,
+.bottom-nav,
+button {
+    -webkit-user-select: none;
+    user-select: none;
+}
+
+/* Smooth momentum scrolling on iOS */
+.overflow-y-auto,
+.overflow-auto,
+.custom-scrollbar {
+    -webkit-overflow-scrolling: touch;
+}

@@ -2,213 +2,100 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    /**
-     * 🔐 CORE AUTHENTICATION & ROLE HELPERS
-     */
+    // --------- Helpers ---------
     function isSignedIn() {
       return request.auth != null;
     }
 
-    function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
+    function isOwner(uid) {
+      return request.auth.uid == uid;
     }
 
     function getUserData() {
-      return exists(/databases/$(database)/documents/users/$(request.auth.uid))
-        ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data
-        : {"role": "public", "teamId": null};
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function hasRole(role) {
+      return isSignedIn() && getUserData().role == role;
     }
 
     function isAdmin() {
-      let data = getUserData();
-      return data.role == "admin" || request.auth.token.email == "jagadish2k2006@gmail.com";
+      return hasRole('admin');
     }
 
-    function isManager() {
-      return getUserData().role == "event_manager";
+    function isEventManager() {
+      return hasRole('event_manager') || isAdmin();
     }
 
-    function getTeamId() {
-      return getUserData().teamId;
+    function isSubscriber() {
+      return hasRole('subscriber') || hasRole('member') || isEventManager();
     }
 
-    /**
-     * 🛡️ RATE LIMITING (Prevent spam/DDoS)
-     */
-    function isRateLimited() {
-      // Check if last action was less than 1 second ago (if client provides timestamp)
-      return request.time < resource.data.updatedAt + duration.value(1, 's');
+    function isSameTeam(teamId) {
+      return isSignedIn() && getUserData().teamId == teamId;
     }
 
-    /**
-     * 🧪 INJECTION PROTECTION
-     */
-    function isValidEvent(data) {
-      return data.eventName is string && 
-             data.eventName.size() > 1 && 
-             data.collegeName is string &&
-             data.eventType is string &&
-             data.createdBy is string;
-    }
-
-    function isValidUserUpdate(data, oldData) {
-      let roleUnchanged = data.role == oldData.role || data.role == "public";
-      let emailUnchanged = data.email == oldData.email;
-      return roleUnchanged && emailUnchanged;
-    }
-
-    /**
-     * 🌍 GLOBAL & PERSONAL EVENTS
-     */
+    // --------- Global Events (shared catalog) ---------
     match /events/{eventId} {
-      allow read: if isSignedIn(); 
-
-      allow create: if isSignedIn() && isValidEvent(request.resource.data) && (
-        isAdmin() || isManager() || (
-          request.resource.data.teamId != null && 
-          request.resource.data.teamId == getTeamId()
-        )
-      );
-
-      allow update: if isSignedIn() && isValidEvent(request.resource.data) && (
-        isAdmin() || isManager() || (resource != null && resource.data.createdBy == request.auth.uid)
-      );
-      
-      allow delete: if isAdmin() || isManager() || (resource != null && resource.data.createdBy == request.auth.uid);
+      allow read: if isSignedIn();
+      // Only admins and event managers can create/edit/delete global events
+      allow create, update, delete: if isEventManager();
     }
 
-    /**
-     * 👥 USER PROFILES (Privacy Hardening)
-     */
+    // --------- Users ---------
     match /users/{userId} {
-      // PRIVACY: Only allow discovery of basic info, hide PII from non-owners/non-admins
-      // NOTE: In Firestore rules, we can only block the WHOLE read or allow it.
-      // So we restrict 'list' (discovery queries) but allow 'get' if they have the ID.
-      // For true field-level security, we advice moving PII to /users/{userId}/private/data
-      
-      allow read: if isSignedIn() && (
-        isOwner(userId) || 
-        isAdmin() || 
-        resource.data.teamId == request.auth.uid ||
-        resource.data.teamId == getTeamId() ||
-        // Allow looking up user by ID (single doc read) for invitation/discovery
-        request.method == 'get'
-      );
-      
-      allow create: if isOwner(userId) && 
-                    request.resource.data.role == "public" && 
-                    request.resource.data.email is string;
-      
-      allow update: if isAdmin() || (
-                      isOwner(userId) && 
-                      isValidUserUpdate(request.resource.data, resource.data)
-                    ) || (
-                      isSignedIn() && 
-                      resource.data.teamId == request.auth.uid && 
-                      request.resource.data.diff(resource.data).affectedKeys().hasOnly(['position'])
-                    );
+      // Users can read their own doc; admins can read all
+      allow read: if isOwner(userId) || isAdmin();
+      // Users can update their own profile; admins can update any
+      allow update: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId);
+      allow delete: if isAdmin();
 
+      // -- Personal per-event prize stats --
+      match /eventStats/{eventId} {
+        // Only the owner can read/write their own event stats
+        allow read, write: if isOwner(userId);
+      }
+    }
+
+    // --------- Team Event Data (private performance stats) ---------
+    match /team_event_data/{teamId}/events/{eventId} {
+      // Team members can read stats for their own team
+      allow read: if isSameTeam(teamId) || isAdmin();
+      // Members can write their own team's stats
+      allow write: if isSameTeam(teamId) || isAdmin();
+    }
+
+    // --------- Team Join Requests ---------
+    match /team_requests/{requestId} {
+      allow read: if isSignedIn() &&
+        (resource.data.userId == request.auth.uid ||
+         resource.data.teamId == request.auth.uid ||
+         isAdmin());
+      // Any signed-in user can create a request (for themselves)
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      // Only the team leader (teamId == uid) or admin can update/delete
+      allow update, delete: if isSignedIn() &&
+        (resource.data.teamId == request.auth.uid || isAdmin());
+    }
+
+    // --------- Team Messages ---------
+    match /team_messages/{messageId} {
+      allow read: if isSignedIn() && isSameTeam(resource.data.teamId);
+      allow create: if isSignedIn() && isSameTeam(request.resource.data.teamId)
+                       && request.resource.data.senderId == request.auth.uid;
       allow delete: if isAdmin();
     }
 
-    /**
-     * 📊 TEAM EVENT DATA
-     */
-    match /teamEventData/{docId} {
-      function isMemberOfTeam(targetTeamId) {
-        return targetTeamId == request.auth.uid || targetTeamId == getTeamId();
-      }
-
-      allow read: if isSignedIn() && (isMemberOfTeam(resource.data.teamId) || isAdmin());
-      allow create: if isSignedIn() && isMemberOfTeam(request.resource.data.teamId) && 
-                    request.resource.data.teamId is string && 
-                    request.resource.data.eventId is string;
-      allow update: if isSignedIn() && isMemberOfTeam(resource.data.teamId);
-      allow delete: if isAdmin() || (isSignedIn() && isMemberOfTeam(resource.data.teamId));
-    }
-
-    /**
-     * 👤 INDIVIDUAL USER NOTES
-     */
-    match /notes/{noteId} {
-      allow read, write: if isSignedIn() && (
-        (resource != null && resource.data.createdBy == request.auth.uid) ||
-        (request.resource != null && request.resource.data.createdBy == request.auth.uid)
-      );
-    }
-
-    /**
-     * 🏛 COLLEGE REPOSITORY
-     */
-    match /colleges/{collegeId} {
-      allow read: if isSignedIn();
-      allow write: if isAdmin() || isManager();
-    }
-
-    /**
-     * 💳 PAYMENT VERIFICATION
-     */
+    // --------- Payment Requests ---------
     match /payment_requests/{requestId} {
-      allow create: if isSignedIn() && 
-                    request.resource.data.userId == request.auth.uid && 
-                    request.resource.data.status == "pending" &&
-                    request.resource.data.keys().hasAll(['userId', 'status', 'amount', 'planName']);
-      
-      allow read: if isAdmin() || (resource != null && resource.data.userId == request.auth.uid);
-      allow update, delete: if isAdmin();
-    }
-
-    /**
-     * ⚙️ SYSTEM SETTINGS
-     */
-    match /settings/{settingId} {
-      allow read: if isSignedIn();
-      allow write: if isAdmin();
-    }
-
-    /**
-     * 💬 TEAM MESSAGES (Rate Limited)
-     */
-    match /team_messages/{messageId} {
-      allow read: if isSignedIn() && (
-        resource.data.teamId == request.auth.uid || 
-        resource.data.teamId == getTeamId() || 
-        isAdmin()
-      );
-      allow create: if isSignedIn() && 
-                    request.resource.data.content is string &&
-                    request.resource.data.content.size() < 5000 &&
-                    (
-                      request.resource.data.teamId == request.auth.uid || 
-                      request.resource.data.teamId == getTeamId()
-                    );
-      allow update, delete: if isAdmin() || (resource != null && resource.data.senderId == request.auth.uid);
-    }
-
-    /**
-     * 👥 TEAM JOIN REQUESTS
-     */
-    match /team_requests/{requestId} {
-      allow create: if isSignedIn() && 
-                    request.resource.data.userId == request.auth.uid &&
-                    request.resource.data.status == "pending";
-      allow read: if isSignedIn() && (
-        resource.data.userId == request.auth.uid || 
-        resource.data.teamId == request.auth.uid ||
-        isAdmin()
-      );
-      allow update: if isSignedIn() && (
-        resource.data.teamId == request.auth.uid || 
-        isAdmin()
-      );
-      allow delete: if isSignedIn() && (
-        resource.data.userId == request.auth.uid || 
-        resource.data.teamId == request.auth.uid ||
-        isAdmin()
-      );
+      // User can read their own; admin/event_manager can read all
+      allow read: if isSignedIn() &&
+        (resource.data.userId == request.auth.uid || isEventManager());
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      // Only admins can approve/reject payments
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
     }
   }
 }
-
-
-

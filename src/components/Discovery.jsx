@@ -1,15 +1,30 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Search, Globe, Zap, ArrowRight, Download, ExternalLink, Sparkles, Filter, Trophy, Users, Terminal, Cpu, ShieldCheck, Clock } from 'lucide-react';
 import { cn } from '../utils';
 import { addEvent, EventType } from '../db';
+
+// Module-level cache persists while the component is mounted
+const queryCache = new Map();
+
+const CATEGORY_FILTERS = [
+    { id: 'all', label: 'All Types' },
+    { id: 'Hackathon', label: 'Hackathon' },
+    { id: 'Contest', label: 'Contest' },
+    { id: 'Workshop', label: 'Workshop' },
+    { id: 'Paper Presentation', label: 'Paper Pres.' },
+    { id: 'Project Expo', label: 'Project Expo' },
+];
 
 const Discovery = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const [isSearching, setIsSearching] = useState(false);
     const [results, setResults] = useState([]);
     const [selectedPlatform, setSelectedPlatform] = useState('all');
+    const [selectedCategory, setSelectedCategory] = useState('all');
     const [searchPulse, setSearchPulse] = useState(false);
+    const [lastSearched, setLastSearched] = useState(null);
+    const [lastSearchQuery, setLastSearchQuery] = useState('');
 
     const platforms = [
         { id: 'all', name: 'All Networks', icon: Sparkles, color: 'text-indigo-500' },
@@ -56,9 +71,28 @@ const Discovery = () => {
         ]);
     }, []);
 
+    // Format time since last search
+    const getLastSearchedLabel = () => {
+        if (!lastSearched) return null;
+        const secs = Math.floor((Date.now() - lastSearched) / 1000);
+        if (secs < 60) return `${secs}s ago`;
+        const mins = Math.floor(secs / 60);
+        if (mins < 60) return `${mins}m ago`;
+        return `${Math.floor(mins / 60)}h ago`;
+    };
+
     const handleAIsignSearch = async (e) => {
         e.preventDefault();
         if (!searchQuery.trim()) return;
+
+        // Check cache first
+        const cacheKey = `${searchQuery.trim().toLowerCase()}::${selectedPlatform}`;
+        if (queryCache.has(cacheKey)) {
+            setResults(queryCache.get(cacheKey));
+            setLastSearchQuery(searchQuery.trim());
+            setLastSearched(Date.now());
+            return;
+        }
 
         setIsSearching(true);
         setSearchPulse(true);
@@ -241,10 +275,41 @@ const Discovery = () => {
 
             {/* Data Feed Grid */}
             <div className="max-w-7xl mx-auto px-4 lg:px-8">
+
+                {/* Category Filter Chips + Last Searched */}
+                {results.length > 0 && (
+                    <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
+                        <div className="flex flex-wrap gap-2">
+                            {CATEGORY_FILTERS.map(cat => (
+                                <button
+                                    key={cat.id}
+                                    onClick={() => setSelectedCategory(cat.id)}
+                                    className={cn(
+                                        "px-3 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all border",
+                                        selectedCategory === cat.id
+                                            ? "bg-indigo-600 text-white border-indigo-600 shadow-md"
+                                            : "bg-white dark:bg-slate-800 text-slate-400 border-slate-200 dark:border-slate-700 hover:border-indigo-400"
+                                    )}
+                                >
+                                    {cat.label}
+                                </button>
+                            ))}
+                        </div>
+                        {lastSearched && (
+                            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+                                <Clock size={10} />
+                                Last searched: {getLastSearchedLabel()} — &quot;{lastSearchQuery}&quot;
+                            </p>
+                        )}
+                    </div>
+                )}
+
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
                     <AnimatePresence mode="popLayout">
-                        {results.length > 0 ? (
-                            results.map((event, idx) => (
+                        {(() => {
+                            const visibleResults = selectedCategory === 'all' ? results : results.filter(r => r.eventType === selectedCategory);
+                            return visibleResults.length > 0 ? (
+                            visibleResults.map((event, idx) => (
                                 <motion.div
                                     key={event.id}
                                     layout
@@ -315,11 +380,14 @@ const Discovery = () => {
                                     </div>
                                 </motion.div>
                             ))
-                        ) : isSearching ? (
+                        ) : null;
+                        })()}
+                        {isSearching && (
                             [1, 2, 3, 4, 5, 6].map(i => (
                                 <div key={i} className="bg-slate-100 dark:bg-slate-800/50 rounded-[3rem] h-[450px] animate-pulse border-2 border-dashed border-slate-200 dark:border-slate-800" />
                             ))
-                        ) : searchQuery && (
+                        )}
+                        {!isSearching && results.length === 0 && searchQuery && (
                             <div className="col-span-full py-32 text-center">
                                 <div className="w-24 h-24 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-8 animate-bounce">
                                     <ShieldCheck size={48} className="text-slate-300" />

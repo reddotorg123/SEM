@@ -3,7 +3,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../store';
-import { db, EventType } from '../db';
+import { db, EventType, getUserPrizeSummary } from '../db';
 import EventCard from './EventCard';
 import { BarChart3, TrendingUp, Award, DollarSign, Target, Zap, Globe, Map, Shield } from 'lucide-react';
 import { cn } from '../utils';
@@ -42,6 +42,15 @@ const Analytics = () => {
         return await getMergedEvents();
     }, [teamId]) || [];
     const [modalConfig, setModalConfig] = useState({ isOpen: false, type: null, title: '' });
+    const [personalPrize, setPersonalPrize] = useState({ totalPrize: 0, winCount: 0 });
+
+    // Load personal prize summary
+    React.useEffect(() => {
+        const uid = useAppStore.getState().userProfile?.uid;
+        if (uid) {
+            getUserPrizeSummary(uid).then(setPersonalPrize);
+        }
+    }, [events]);
 
     const openAnalyticsModal = (type, title) => {
         setModalConfig({ isOpen: true, type, title });
@@ -70,7 +79,9 @@ const Analytics = () => {
         const avgPrize = totalPrize / total;
 
         const wonEvents = events.filter(e => e.status === 'Won');
-        const wonPrize = wonEvents.reduce((sum, e) => sum + (parseFloat(e.prizeWon) || 0), 0);
+        // Use personal prize total if available, otherwise fall back to team prizeWon
+        const teamWonPrize = wonEvents.reduce((sum, e) => sum + (parseFloat(e.prizeWon) || 0), 0);
+        const wonPrize = personalPrize.totalPrize > 0 ? personalPrize.totalPrize : teamWonPrize;
         const paidFees = events.filter(e => e.status === 'Attended' || e.status === 'Won')
             .reduce((sum, e) => sum + (parseFloat(e.registrationFee) || 0), 0);
         const roi = paidFees > 0 ? ((wonPrize - paidFees) / paidFees * 100) : 0;

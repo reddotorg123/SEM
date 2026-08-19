@@ -29,6 +29,12 @@ const safeDiff = (date) => {
     }
 };
 
+// Strips HTML tags from a string for plain-text card previews
+const stripHtml = (html) => {
+    if (!html) return '';
+    return html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+};
+
 // Removed local DEFAULT_POSTERS and getDefaultPoster definitions.
 
 const PosterImage = ({ event }) => {
@@ -78,6 +84,11 @@ const PosterImage = ({ event }) => {
 
 const EventCard = React.memo(({ event, compact = false }) => {
     const setSelectedEvent = useAppStore((state) => state.setSelectedEvent);
+    const userProfile = useAppStore((state) => state.userProfile);
+    const teamId = useAppStore((state) => state.teamId);
+    const userId = userProfile?.uid;
+    // User is in a real team when teamId is set and differs from their own uid
+    const isInTeam = teamId && teamId !== userId;
     const openModal = useAppStore((state) => state.openModal);
     const togglePinnedEvent = useAppStore((state) => state.togglePinnedEvent);
     const pinnedEvents = useAppStore((state) => state.preferences.pinnedEvents || []);
@@ -258,7 +269,7 @@ const EventCard = React.memo(({ event, compact = false }) => {
                             </div>
                         ) : (
                             <p className="text-[10px] font-medium text-slate-500 dark:text-slate-400 line-clamp-2 leading-relaxed">
-                                {event.description}
+                                {stripHtml(event.description)}
                             </p>
                         )}
                     </div>
@@ -291,7 +302,8 @@ const EventCard = React.memo(({ event, compact = false }) => {
                         </div>
                     </div>
 
-                    {/* Leader / Contact Info */}
+                    {/* Leader / Contact Info — only visible when user is in a team */}
+                    {isInTeam && (
                     <div className="flex items-center gap-2">
                         <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg sm:rounded-xl bg-violet-50 dark:bg-violet-900/20 flex items-center justify-center shrink-0">
                             <ShieldCheck size={14} className="text-violet-600 dark:text-violet-500" />
@@ -303,6 +315,7 @@ const EventCard = React.memo(({ event, compact = false }) => {
                             </span>
                         </div>
                     </div>
+                    )}
 
                     {/* Deadline */}
                     <div className="flex items-center gap-2">

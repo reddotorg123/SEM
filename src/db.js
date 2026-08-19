@@ -32,6 +32,16 @@ export class EventDatabase extends Dexie {
             notes: '++id, eventId, content, createdAt',
             settings: 'key, value'
         });
+
+        // Version 3: Added userEventStats for per-user individual prize tracking
+        this.version(3).stores({
+            events: '++id, collegeName, eventName, eventType, registrationDeadline, startDate, endDate, status, priorityScore, createdAt, contact1, contact2, leader, prizeWon, isShortlisted, serverId, teamId, createdBy',
+            teamEventData: '++id, teamId, eventId, status, prizeWon, isShortlisted, updatedAt',
+            userEventStats: '++id, userId, eventId, prizeWon, updatedAt',
+            colleges: '++id, name, location, pastEvents',
+            notes: '++id, eventId, content, createdAt',
+            settings: 'key, value'
+        });
     }
 }
 
@@ -477,9 +487,64 @@ export const getAllEvents = async () => {
     return await getMergedEvents();
 };
 
+
+/**
+ * USER EVENT STATS: Save or update a user's personal prize/stat for an event.
+ */
+export const setUserEventStat = async (userId, eventId, data) => {
+    if (!userId || !eventId) return;
+    try {
+        const existing = await db.userEventStats
+            .where('userId').equals(userId)
+            .and(item => item.eventId === eventId)
+            .first();
+        const payload = { userId, eventId, updatedAt: new Date().toISOString(), ...data };
+        if (existing) {
+            await db.userEventStats.update(existing.id, payload);
+        } else {
+            await db.userEventStats.add(payload);
+        }
+    } catch (e) {
+        console.error('[DB] setUserEventStat failed:', e);
+    }
+};
+
+/**
+ * USER EVENT STATS: Get a single user's stat record for a specific event.
+ */
+export const getUserEventStat = async (userId, eventId) => {
+    if (!userId || !eventId) return null;
+    try {
+        return await db.userEventStats
+            .where('userId').equals(userId)
+            .and(item => item.eventId === eventId)
+            .first() || null;
+    } catch (e) {
+        console.warn('[DB] userEventStats table not ready yet:', e.message);
+        return null;
+    }
+};
+
+/**
+ * USER EVENT STATS: Returns a summary { totalPrize, winCount } for a user.
+ */
+export const getUserPrizeSummary = async (userId) => {
+    if (!userId) return { totalPrize: 0, winCount: 0 };
+    try {
+        const stats = await db.userEventStats.where('userId').equals(userId).toArray();
+        const totalPrize = stats.reduce((sum, s) => sum + (parseFloat(s.prizeWon) || 0), 0);
+        const winCount = stats.filter(s => parseFloat(s.prizeWon) > 0).length;
+        return { totalPrize, winCount, eventIds: stats.map(s => s.eventId) };
+    } catch (e) {
+        console.warn('[DB] getUserPrizeSummary failed:', e.message);
+        return { totalPrize: 0, winCount: 0 };
+    }
+};
+
 export const purgeDatabase = async () => {
     await db.events.clear();
     await db.teamEventData.clear();
     await db.colleges.clear();
     await db.notes.clear();
+    try { await db.userEventStats.clear(); } catch(_) {}
 };
