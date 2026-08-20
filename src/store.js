@@ -133,6 +133,25 @@ export const useAppStore = create(
                 set({ firebaseConfig: config });
             },
 
+            // --- SUPABASE INFRASTRUCTURE ---
+            supabaseConfig: (() => {
+                const stored = localStorage.getItem('supabase_config');
+                if (stored) {
+                    try {
+                        const parsed = JSON.parse(stored);
+                        if (parsed && parsed.supabaseUrl) return parsed;
+                    } catch (e) {}
+                }
+                return {
+                    supabaseUrl: import.meta.env.VITE_SUPABASE_URL || '',
+                    supabaseKey: import.meta.env.VITE_SUPABASE_ANON_KEY || ''
+                };
+            })(),
+            setSupabaseConfig: (config) => {
+                localStorage.setItem('supabase_config', JSON.stringify(config));
+                set({ supabaseConfig: config });
+            },
+
             // Keeps track of whether we are syncing with Firebase or just working locally
             cloudProvider: localStorage.getItem('cloud_provider') || 'firestore',
             setCloudProvider: (provider) => {
@@ -200,6 +219,7 @@ export const useAppStore = create(
                 theme: state.theme,
                 preferences: state.preferences,
                 firebaseConfig: state.firebaseConfig,
+                supabaseConfig: state.supabaseConfig,
                 cloudProvider: state.cloudProvider,
                 sortBy: state.sortBy,
                 sortOrder: state.sortOrder,

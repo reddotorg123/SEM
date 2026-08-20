@@ -22,31 +22,50 @@ const safeFormat = (date, formatStr) => {
     }
 };
 
-const DetailPosterImage = ({ event }) => {
-    const [imgSrc, setImgSrc] = useState(null);
+const PostersCarousel = ({ event }) => {
+    const [images, setImages] = useState([]);
+    const [activeIndex, setActiveIndex] = useState(0);
 
     useEffect(() => {
-        let objectUrl = null;
+        const list = [];
+        const objectUrls = [];
 
-        if (event.posterBlob instanceof Blob) {
-            objectUrl = URL.createObjectURL(event.posterBlob);
-            setImgSrc(objectUrl);
-        } else if (typeof event.posterBlob === 'string' && event.posterBlob) {
-            setImgSrc(resolveImageUrl(event.posterBlob));
-        } else if (event.posterUrl) {
-            setImgSrc(resolveImageUrl(event.posterUrl));
-        } else {
-            setImgSrc(null);
+        // 1. Process Blobs
+        if (Array.isArray(event.posterBlobs)) {
+            event.posterBlobs.forEach(blob => {
+                if (blob instanceof Blob) {
+                    const objectUrl = URL.createObjectURL(blob);
+                    objectUrls.push(objectUrl);
+                    list.push(objectUrl);
+                } else if (typeof blob === 'string' && blob) {
+                    list.push(resolveImageUrl(blob));
+                }
+            });
+        } else if (event.posterBlob instanceof Blob) {
+            const objectUrl = URL.createObjectURL(event.posterBlob);
+            objectUrls.push(objectUrl);
+            list.push(objectUrl);
         }
 
-        return () => {
-            if (objectUrl) {
-                URL.revokeObjectURL(objectUrl);
-            }
-        };
-    }, [event.posterBlob, event.posterUrl]);
+        // 2. Process URLs
+        if (Array.isArray(event.posterUrls)) {
+            event.posterUrls.forEach(url => {
+                if (url && !list.includes(url)) {
+                    list.push(resolveImageUrl(url));
+                }
+            });
+        } else if (event.posterUrl && !list.includes(event.posterUrl)) {
+            list.push(resolveImageUrl(event.posterUrl));
+        }
 
-    if (!imgSrc) return (
+        setImages(list);
+
+        return () => {
+            objectUrls.forEach(url => URL.revokeObjectURL(url));
+        };
+    }, [event.posterBlobs, event.posterUrls, event.posterBlob, event.posterUrl]);
+
+    if (images.length === 0) return (
         <div className="w-full h-32 sm:h-40 bg-gradient-to-br from-indigo-500/10 via-violet-500/10 to-transparent rounded-xl flex flex-col items-center justify-center border-2 border-dashed border-slate-200 dark:border-slate-800 mb-3">
             <Zap size={24} className="text-indigo-400 mb-2 animate-pulse" />
             <span className="text-[9px] font-black uppercase tracking-[0.3em] text-slate-400">No Information Poster</span>
@@ -56,14 +75,39 @@ const DetailPosterImage = ({ event }) => {
     return (
         <div className="mb-3 group relative rounded-xl overflow-hidden shadow-lg border border-white/20">
             <img
-                src={imgSrc}
+                src={images[activeIndex]}
                 alt={event.eventName}
-                className="w-full max-h-[220px] sm:max-h-[300px] object-cover bg-slate-900 group-hover:scale-105 transition-transform duration-700"
-                onError={() => setImgSrc(null)}
+                className="w-full h-[220px] sm:h-[300px] object-cover bg-slate-900 transition-all duration-300"
             />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-3 pointer-events-none">
-                <p className="text-white text-[8px] font-black uppercase tracking-widest">Image Source Locked</p>
-            </div>
+            {images.length > 1 && (
+                <>
+                    {/* Navigation Arrows */}
+                    <button 
+                        type="button"
+                        onClick={() => setActiveIndex(prev => (prev - 1 + images.length) % images.length)}
+                        className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/40 text-white flex items-center justify-center text-sm hover:bg-black/60 z-10"
+                    >
+                        &#9001;
+                    </button>
+                    <button 
+                        type="button"
+                        onClick={() => setActiveIndex(prev => (prev + 1) % images.length)}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-black/40 text-white flex items-center justify-center text-sm hover:bg-black/60 z-10"
+                    >
+                        &#9002;
+                    </button>
+                    
+                    {/* Dots indicator */}
+                    <div className="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1 bg-black/30 px-2 py-1 rounded-full z-10">
+                        {images.map((_, idx) => (
+                            <span 
+                                key={idx} 
+                                className={cn("w-1.5 h-1.5 rounded-full transition-all", idx === activeIndex ? "bg-white scale-125" : "bg-white/40")}
+                            />
+                        ))}
+                    </div>
+                </>
+            )}
         </div>
     );
 };
@@ -337,7 +381,7 @@ const EventDetailsModal = () => {
                     <div className="p-3 sm:p-4">
                         {/* Poster Image (Zoomable) */}
                         <div onClick={() => setIsZoomed(true)} className="cursor-zoom-in relative group rounded-xl overflow-hidden shadow-lg border border-white/20 mb-3">
-                            <DetailPosterImage event={event} />
+                            <PostersCarousel event={event} />
                             <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
                                 <span className="text-[9px] font-black text-white uppercase tracking-[0.2em] border border-white/30 px-3 py-1 rounded-full backdrop-blur-sm">Click to Expand</span>
                             </div>
@@ -426,25 +470,49 @@ const EventDetailsModal = () => {
                             </div>
                         </div>
 
-                        {/* Contact Bar */}
-                        <a 
-                            href={userRole === 'public' ? '#' : `tel:${event.contact1}`} 
-                            onClick={(e) => userRole === 'public' && (e.preventDefault(), openModal('payment'))}
-                            className="p-2.5 sm:p-3 bg-slate-900 text-white rounded-lg shadow-sm flex items-center gap-2.5 hover:scale-[1.01] transition-transform mb-3"
-                        >
-                            <div className="w-7 h-7 rounded-md bg-white/10 flex items-center justify-center text-white shrink-0"><Phone size={12} /></div>
-                            <div className="flex-1">
-                                <span className="text-[7px] font-black uppercase tracking-wider text-white/50 block">Primary Contact</span>
-                                <span className="text-[11px] font-mono font-bold leading-none">
-                                    {(event.contact1 && userRole !== 'public') 
-                                        ? event.contact1 
-                                        : (event.contact1 
-                                            ? `${event.contact1.substring(0, 3)}****${event.contact1.substring(event.contact1.length - 3)}` 
-                                            : '91+ **********')}
-                                </span>
-                            </div>
-                            {userRole === 'public' && <div className="text-[6px] font-black uppercase px-1.5 py-1 bg-indigo-500 rounded text-white tracking-widest">Unlock</div>}
-                        </a>
+                        {/* Primary Contact Bar */}
+                        {event.contact1 && (
+                            <a 
+                                href={userRole === 'public' ? '#' : `tel:${event.contact1}`} 
+                                onClick={(e) => userRole === 'public' && (e.preventDefault(), openModal('payment'))}
+                                className="p-2.5 sm:p-3 bg-slate-900 text-white rounded-lg shadow-sm flex items-center gap-2.5 hover:scale-[1.01] transition-transform mb-2"
+                            >
+                                <div className="w-7 h-7 rounded-md bg-white/10 flex items-center justify-center text-white shrink-0"><Phone size={12} /></div>
+                                <div className="flex-1">
+                                    <span className="text-[7px] font-black uppercase tracking-wider text-white/50 block">Primary Contact</span>
+                                    <span className="text-[11px] font-mono font-bold leading-none">
+                                        {(event.contact1 && userRole !== 'public') 
+                                            ? event.contact1 
+                                            : (event.contact1 
+                                                ? `${event.contact1.substring(0, 3)}****${event.contact1.substring(event.contact1.length - 3)}` 
+                                                : '91+ **********')}
+                                    </span>
+                                </div>
+                                {userRole === 'public' && <div className="text-[6px] font-black uppercase px-1.5 py-1 bg-indigo-500 rounded text-white tracking-widest">Unlock</div>}
+                            </a>
+                        )}
+
+                        {/* Secondary Contact Bar */}
+                        {event.contact2 && (
+                            <a 
+                                href={userRole === 'public' ? '#' : `tel:${event.contact2}`} 
+                                onClick={(e) => userRole === 'public' && (e.preventDefault(), openModal('payment'))}
+                                className="p-2.5 sm:p-3 bg-slate-900 text-white rounded-lg shadow-sm flex items-center gap-2.5 hover:scale-[1.01] transition-transform mb-3"
+                            >
+                                <div className="w-7 h-7 rounded-md bg-white/10 flex items-center justify-center text-white shrink-0"><Phone size={12} /></div>
+                                <div className="flex-1">
+                                    <span className="text-[7px] font-black uppercase tracking-wider text-white/50 block">Secondary Contact</span>
+                                    <span className="text-[11px] font-mono font-bold leading-none">
+                                        {(event.contact2 && userRole !== 'public') 
+                                            ? event.contact2 
+                                            : (event.contact2 
+                                                ? `${event.contact2.substring(0, 3)}****${event.contact2.substring(event.contact2.length - 3)}` 
+                                                : '91+ **********')}
+                                    </span>
+                                </div>
+                                {userRole === 'public' && <div className="text-[6px] font-black uppercase px-1.5 py-1 bg-indigo-500 rounded text-white tracking-widest">Unlock</div>}
+                            </a>
+                        )}
 
                         {/* About Section */}
                         <div className="p-3 sm:p-4 bg-white dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-800 shadow-sm mb-3">
@@ -503,25 +571,75 @@ const EventDetailsModal = () => {
                                 href={event.website}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="mt-2 w-full h-10 sm:h-11 bg-indigo-600 text-white rounded-lg flex items-center justify-center gap-2 group hover:brightness-110 transition-all font-black text-[9px] uppercase tracking-widest"
+                                className="mt-2 w-full h-10 sm:h-11 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-white rounded-lg flex items-center justify-center gap-2 group hover:brightness-110 transition-all font-black text-[9px] uppercase tracking-widest"
                             >
-                                <Globe size={14} />
+                                <Globe size={14} className="text-indigo-500" />
                                 Official Website
                                 <ExternalLink size={12} />
                             </a>
                         )}
 
-                        {event.registrationLink && (
-                            <a
-                                href={event.registrationLink}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="mt-2 w-full h-10 sm:h-11 bg-indigo-600 text-white rounded-lg flex items-center justify-center gap-2 group hover:brightness-110 transition-all font-black text-[9px] uppercase tracking-widest shadow-lg shadow-indigo-500/20"
-                            >
-                                <ExternalLink size={14} />
-                                Registration Form
-                                <ExternalLink size={12} />
-                            </a>
+                        {/* Multiple Registration Links */}
+                        {Array.isArray(event.registrationLinks) && event.registrationLinks.length > 0 ? (
+                            event.registrationLinks.map((link, idx) => (
+                                link.url && (
+                                    <a
+                                        key={idx}
+                                        href={link.url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="mt-2 w-full h-10 sm:h-11 bg-indigo-600 text-white rounded-lg flex items-center justify-center gap-2 group hover:brightness-110 transition-all font-black text-[9px] uppercase tracking-widest shadow-lg shadow-indigo-500/20"
+                                    >
+                                        <ExternalLink size={12} />
+                                        {link.label || `Register Link ${idx + 1}`}
+                                        <ExternalLink size={12} />
+                                    </a>
+                                )
+                            ))
+                        ) : (
+                            event.registrationLink && (
+                                <a
+                                    href={event.registrationLink}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="mt-2 w-full h-10 sm:h-11 bg-indigo-600 text-white rounded-lg flex items-center justify-center gap-2 group hover:brightness-110 transition-all font-black text-[9px] uppercase tracking-widest shadow-lg shadow-indigo-500/20"
+                                >
+                                    <ExternalLink size={12} />
+                                    Registration Form
+                                    <ExternalLink size={12} />
+                                </a>
+                            )
+                        )}
+
+                        {/* Social Media Links */}
+                        {(event.instagram || event.linkedin || event.twitter || event.youtube) && (
+                            <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800">
+                                <h4 className="text-[7px] font-black uppercase tracking-[0.2em] text-slate-400 mb-2 flex items-center gap-1.5">
+                                    <Globe size={10} /> Social Channels
+                                </h4>
+                                <div className="flex gap-2">
+                                    {event.instagram && (
+                                        <a href={event.instagram} target="_blank" rel="noopener noreferrer" className="px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-950/20 flex items-center justify-center text-slate-600 dark:text-slate-300 hover:text-indigo-600 transition-all font-black text-[8px] uppercase tracking-wider">
+                                            Instagram
+                                        </a>
+                                    )}
+                                    {event.linkedin && (
+                                        <a href={event.linkedin} target="_blank" rel="noopener noreferrer" className="px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-950/20 flex items-center justify-center text-slate-600 dark:text-slate-300 hover:text-indigo-600 transition-all font-black text-[8px] uppercase tracking-wider">
+                                            LinkedIn
+                                        </a>
+                                    )}
+                                    {event.twitter && (
+                                        <a href={event.twitter} target="_blank" rel="noopener noreferrer" className="px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-950/20 flex items-center justify-center text-slate-600 dark:text-slate-300 hover:text-indigo-600 transition-all font-black text-[8px] uppercase tracking-wider">
+                                            Twitter
+                                        </a>
+                                    )}
+                                    {event.youtube && (
+                                        <a href={event.youtube} target="_blank" rel="noopener noreferrer" className="px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-indigo-50 dark:hover:bg-indigo-950/20 flex items-center justify-center text-slate-600 dark:text-slate-300 hover:text-indigo-600 transition-all font-black text-[8px] uppercase tracking-wider">
+                                            YouTube
+                                        </a>
+                                    )}
+                                </div>
+                            </div>
                         )}
 
                         {/* Calendar Integration */}

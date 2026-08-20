@@ -4,39 +4,41 @@ import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
 import { useAppStore } from '../store';
 import { db, updateEvent, EventType, EventStatus } from '../db';
-import { X, Save, Sparkles, Image as ImageIcon, Link as LinkIcon, Calendar, Trophy, MapPin, Users, Phone, User, Info, Check, Clock } from 'lucide-react';
+import { X, Save, Sparkles, Image as ImageIcon, Link as LinkIcon, Calendar, Trophy, MapPin, Users, Phone, User, Info, Check, Clock, Plus, Upload } from 'lucide-react';
 import { cn } from '../utils';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { motion, AnimatePresence } from 'framer-motion';
 
-const PreviewImage = ({ blob, url }) => {
-    const [displayUrl, setDisplayUrl] = useState(null);
-
-    useEffect(() => {
-        if (blob instanceof Blob) {
-            const newUrl = URL.createObjectURL(blob);
-            setDisplayUrl(newUrl);
-            return () => URL.revokeObjectURL(newUrl);
-        } else if (url) {
-            setDisplayUrl(url);
-        } else {
-            setDisplayUrl(null);
-        }
-    }, [blob, url]);
-
-    if (!displayUrl) return (
-        <div className="w-full h-40 bg-slate-100 dark:bg-slate-800 rounded-2xl flex flex-col items-center justify-center border-2 border-dashed border-slate-200 dark:border-slate-700">
-            <ImageIcon size={32} className="text-slate-300 mb-2" />
-            <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">No Image Preview</span>
-        </div>
-    );
-
+const PosterPreviews = ({ blobs, urls, onRemoveBlob, onRemoveUrl }) => {
     return (
-        <div className="relative group overflow-hidden rounded-2xl shadow-xl">
-            <img src={displayUrl} alt="Preview" className="w-full h-48 object-cover group-hover:scale-110 transition-transform duration-500" />
-            <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                <span className="bg-white/90 backdrop-blur-md px-3 py-1.5 rounded-full text-[10px] font-black uppercase text-slate-900 border border-white">Current Selection</span>
-            </div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 w-full p-2">
+            {blobs.map((blob, idx) => {
+                const url = blob instanceof Blob ? URL.createObjectURL(blob) : '';
+                return (
+                    <div key={`blob-${idx}`} className="relative group rounded-xl overflow-hidden shadow-md border border-slate-200 dark:border-slate-800">
+                        <img src={url} alt="Local Preview" className="h-20 w-full object-cover" />
+                        <button 
+                            type="button" 
+                            onClick={() => onRemoveBlob(idx)}
+                            className="absolute top-1 right-1 w-5 h-5 rounded-full bg-rose-600 text-white flex items-center justify-center text-[10px] font-black shadow-md hover:bg-rose-700"
+                        >
+                            &times;
+                        </button>
+                    </div>
+                );
+            })}
+            {urls.map((url, idx) => (
+                <div key={`url-${idx}`} className="relative group rounded-xl overflow-hidden shadow-md border border-slate-200 dark:border-slate-800">
+                    <img src={url} alt="Remote Preview" className="h-20 w-full object-cover" />
+                    <button 
+                        type="button" 
+                        onClick={() => onRemoveUrl(idx)}
+                        className="absolute top-1 right-1 w-5 h-5 rounded-full bg-rose-600 text-white flex items-center justify-center text-[10px] font-black shadow-md hover:bg-rose-700"
+                    >
+                        &times;
+                    </button>
+                </div>
+            ))}
         </div>
     );
 };
@@ -76,8 +78,15 @@ const EditEventModal = () => {
         contactNumbers: '',
         posterUrl: '',
         posterBlob: null,
+        posterUrls: [],
+        posterBlobs: [],
+        instagram: '',
+        linkedin: '',
+        twitter: '',
+        youtube: '',
         website: '',
         registrationLink: '',
+        registrationLinks: [{ label: 'Register', url: '' }],
         description: '',
         teamSize: '1',
         eligibility: '',
@@ -91,6 +100,54 @@ const EditEventModal = () => {
         teamName: '',
         customEventType: ''
     });
+
+    const [posterUrlInput, setPosterUrlInput] = useState('');
+
+    const handleAddPosterUrl = () => {
+        if (posterUrlInput.trim()) {
+            setFormData(prev => ({
+                ...prev,
+                posterUrls: [...prev.posterUrls, posterUrlInput.trim()]
+            }));
+            setPosterUrlInput('');
+        }
+    };
+
+    const handleRemovePosterUrl = (index) => {
+        setFormData(prev => ({
+            ...prev,
+            posterUrls: prev.posterUrls.filter((_, i) => i !== index)
+        }));
+    };
+
+    const handleRemovePosterBlob = (index) => {
+        setFormData(prev => ({
+            ...prev,
+            posterBlobs: prev.posterBlobs.filter((_, i) => i !== index)
+        }));
+    };
+
+    const handleRegLinkChange = (index, field, value) => {
+        setFormData(prev => {
+            const updated = [...prev.registrationLinks];
+            updated[index] = { ...updated[index], [field]: value };
+            return { ...prev, registrationLinks: updated };
+        });
+    };
+
+    const handleAddRegLink = () => {
+        setFormData(prev => ({
+            ...prev,
+            registrationLinks: [...prev.registrationLinks, { label: 'Register Link ' + (prev.registrationLinks.length + 1), url: '' }]
+        }));
+    };
+
+    const handleRemoveRegLink = (index) => {
+        setFormData(prev => ({
+            ...prev,
+            registrationLinks: prev.registrationLinks.filter((_, i) => i !== index)
+        }));
+    };
 
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [activeTab, setActiveTab] = useState('basic');
@@ -122,8 +179,15 @@ const EditEventModal = () => {
                 contactNumbers: Array.isArray(event.contactNumbers) ? event.contactNumbers.join(', ') : '',
                 posterUrl: event.posterUrl || '',
                 posterBlob: event.posterBlob || null,
+                posterUrls: Array.isArray(event.posterUrls) ? event.posterUrls : (event.posterUrl ? [event.posterUrl] : []),
+                posterBlobs: Array.isArray(event.posterBlobs) ? event.posterBlobs : (event.posterBlob ? [event.posterBlob] : []),
+                instagram: event.instagram || '',
+                linkedin: event.linkedin || '',
+                twitter: event.twitter || '',
+                youtube: event.youtube || '',
                 website: event.website || '',
                 registrationLink: event.registrationLink || '',
+                registrationLinks: Array.isArray(event.registrationLinks) ? event.registrationLinks : (event.registrationLink ? [{ label: 'Register', url: event.registrationLink }] : [{ label: 'Register', url: '' }]),
                 description: event.description || '',
                 teamSize: event.teamSize || '1',
                 eligibility: event.eligibility || '',
@@ -159,8 +223,12 @@ const EditEventModal = () => {
     };
 
     const handleFileChange = (e) => {
-        if (e.target.files && e.target.files[0]) {
-            setFormData(prev => ({ ...prev, posterBlob: e.target.files[0] }));
+        const files = Array.from(e.target.files);
+        if (files.length > 0) {
+            setFormData(prev => ({
+                ...prev,
+                posterBlobs: [...prev.posterBlobs, ...files]
+            }));
         }
     };
 
@@ -476,50 +544,104 @@ const EditEventModal = () => {
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
                                     <div className="space-y-6">
                                         <div className="form-group">
-                                            <label className="label-premium text-[11px] font-black uppercase tracking-widest mb-4 block">Visual Protocol (Poster)</label>
-                                            <PreviewImage blob={formData.posterBlob} url={formData.posterUrl} />
+                                            <label className="label-premium text-[11px] font-black uppercase tracking-widest mb-4 block">Visual Protocol (Posters)</label>
+                                            <div className="border border-slate-200 dark:border-slate-800 rounded-2xl p-4 min-h-[150px] bg-slate-50 dark:bg-slate-900/50">
+                                                {(formData.posterBlobs.length > 0 || formData.posterUrls.length > 0) ? (
+                                                    <PosterPreviews 
+                                                        blobs={formData.posterBlobs} 
+                                                        urls={formData.posterUrls} 
+                                                        onRemoveBlob={handleRemovePosterBlob} 
+                                                        onRemoveUrl={handleRemovePosterUrl} 
+                                                    />
+                                                ) : (
+                                                    <div className="text-slate-400 text-xs font-semibold text-center p-8">No posters uploaded</div>
+                                                )}
+                                            </div>
                                             <div className="mt-6 flex gap-3">
-                                                <label className="flex-1 px-8 py-4 bg-indigo-600 text-white rounded-2xl font-black text-xs uppercase tracking-[0.2em] text-center cursor-pointer hover:bg-indigo-500 transition-all shadow-xl shadow-indigo-500/20 active:scale-95">
+                                                <label className="flex-grow px-8 py-4 bg-indigo-600 text-white rounded-2xl font-black text-xs uppercase tracking-[0.2em] text-center cursor-pointer hover:bg-indigo-500 transition-all shadow-xl shadow-indigo-500/20 active:scale-95">
                                                     Inject Media
-                                                    <input type="file" className="hidden" onChange={handleFileChange} accept="image/*" />
+                                                    <input type="file" className="hidden" onChange={handleFileChange} accept="image/*" multiple />
                                                 </label>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setFormData(prev => ({ ...prev, posterBlob: null, posterUrl: '' }))}
-                                                    className="px-6 py-4 bg-slate-100 dark:bg-slate-800 text-slate-500 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:text-red-500 transition-all border border-transparent hover:border-red-500/20"
-                                                >
-                                                    Flush
-                                                </button>
                                             </div>
                                         </div>
                                     </div>
                                     <div className="space-y-6">
                                         <div className="form-group">
-                                            <label className="label-premium">Neural Link 0 (Poster URL)</label>
-                                            <div className="relative">
-                                                <ImageIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-emerald-500" size={20} />
-                                                <input type="url" name="posterUrl" value={formData.posterUrl} onChange={handleChange} className="input-premium pl-12 border-emerald-100 dark:border-emerald-800" placeholder="https://cdn.example.com/poster.jpg" />
+                                            <label className="label-premium">Add Poster URLs</label>
+                                            <div className="flex gap-2">
+                                                <div className="relative flex-1">
+                                                    <ImageIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-emerald-500" size={20} />
+                                                    <input type="url" value={posterUrlInput} onChange={(e) => setPosterUrlInput(e.target.value)} className="input-premium pl-12 border-emerald-100 dark:border-emerald-800" placeholder="https://cdn.example.com/poster.jpg" />
+                                                </div>
+                                                <button type="button" onClick={handleAddPosterUrl} className="px-6 bg-slate-950 text-white dark:bg-white dark:text-slate-950 font-black rounded-2xl text-xs uppercase tracking-widest hover:scale-105 active:scale-95 transition-all">Add</button>
                                             </div>
                                         </div>
                                         <div className="form-group">
-                                            <label className="label-premium">Neural Link 1 (Website)</label>
+                                            <label className="label-premium">Website URL</label>
                                             <div className="relative">
                                                 <LinkIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-indigo-500" size={20} />
                                                 <input type="url" name="website" value={formData.website} onChange={handleChange} className="input-premium pl-12" placeholder="https://..." />
                                             </div>
                                         </div>
                                         <div className="form-group">
-                                            <label className="label-premium">Neural Link 2 (Registration)</label>
-                                            <div className="relative">
-                                                <LinkIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-violet-500" size={20} />
-                                                <input type="url" name="registrationLink" value={formData.registrationLink} onChange={handleChange} className="input-premium pl-12" placeholder="https://..." />
+                                            <label className="label-premium">Registration Links</label>
+                                            <div className="space-y-2">
+                                                {formData.registrationLinks.map((link, idx) => (
+                                                    <div key={idx} className="flex gap-2 items-center">
+                                                        <input 
+                                                            type="text" 
+                                                            value={link.label} 
+                                                            onChange={(e) => handleRegLinkChange(idx, 'label', e.target.value)} 
+                                                            placeholder="Label" 
+                                                            className="input-premium flex-1" 
+                                                        />
+                                                        <input 
+                                                            type="url" 
+                                                            value={link.url} 
+                                                            onChange={(e) => handleRegLinkChange(idx, 'url', e.target.value)} 
+                                                            placeholder="URL" 
+                                                            className="input-premium flex-2" 
+                                                        />
+                                                        {formData.registrationLinks.length > 1 && (
+                                                            <button 
+                                                                type="button" 
+                                                                onClick={() => handleRemoveRegLink(idx)} 
+                                                                className="w-10 h-10 bg-rose-50 dark:bg-rose-950/20 text-rose-600 rounded-xl flex items-center justify-center hover:bg-rose-100"
+                                                            >
+                                                                <X size={16} />
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                ))}
+                                                <button 
+                                                    type="button" 
+                                                    onClick={handleAddRegLink} 
+                                                    className="py-2 px-4 border border-indigo-600 text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950/20 rounded-xl text-xs font-bold uppercase tracking-wider flex items-center gap-2 mt-1"
+                                                >
+                                                    <Plus size={14} /> Add Link
+                                                </button>
                                             </div>
                                         </div>
-                                        <div className="p-8 bg-indigo-50 dark:bg-indigo-900/10 rounded-[2.5rem] border-2 border-dashed border-indigo-200 dark:border-indigo-800/50">
-                                            <div className="flex flex-col items-center text-center">
-                                                <Clock className="text-indigo-600 mb-4" size={32} />
-                                                <h4 className="text-[11px] font-black uppercase tracking-[0.3em] text-indigo-600 mb-3">Sync Status</h4>
-                                                <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400 leading-relaxed px-4">Changes made here are instantly replicated across the squad's tactical matrix via Neural Layer 1 (IndexedDB).</p>
+                                        
+                                        <div className="border-t border-slate-100 dark:border-slate-800 pt-6">
+                                            <label className="label-premium mb-4 block">Social Media Links</label>
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                                <div className="form-group">
+                                                    <label className="label-premium">Instagram</label>
+                                                    <input type="url" name="instagram" value={formData.instagram} onChange={handleChange} className="input-premium" placeholder="Profile URL" />
+                                                </div>
+                                                <div className="form-group">
+                                                    <label className="label-premium">LinkedIn</label>
+                                                    <input type="url" name="linkedin" value={formData.linkedin} onChange={handleChange} className="input-premium" placeholder="Company/Profile URL" />
+                                                </div>
+                                                <div className="form-group">
+                                                    <label className="label-premium">Twitter (X)</label>
+                                                    <input type="url" name="twitter" value={formData.twitter} onChange={handleChange} className="input-premium" placeholder="Profile URL" />
+                                                </div>
+                                                <div className="form-group">
+                                                    <label className="label-premium">YouTube</label>
+                                                    <input type="url" name="youtube" value={formData.youtube} onChange={handleChange} className="input-premium" placeholder="Video/Channel URL" />
+                                                </div>
                                             </div>
                                         </div>
                                     </div>

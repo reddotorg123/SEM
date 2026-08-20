@@ -49,6 +49,7 @@ import { cn } from '../utils';
 
 const AdminPanel = () => {
     const userRole = useAppStore((state) => state.userRole);
+    const isRoleVerified = useAppStore((state) => state.isRoleVerified);
     const openModal = useAppStore((state) => state.openModal);
     const setSelectedEvent = useAppStore((state) => state.setSelectedEvent);
 
@@ -69,7 +70,7 @@ const AdminPanel = () => {
     }, [teamId]) || [];
 
     // Security Check
-    if (userRole !== 'admin' && userRole !== 'event_manager') {
+    if (!isRoleVerified || (userRole !== 'admin' && userRole !== 'event_manager')) {
         return (
             <div className="flex flex-col items-center justify-center min-h-[60vh] text-center p-8">
                 <div className="w-20 h-20 bg-rose-50 dark:bg-rose-900/30 rounded-3xl flex items-center justify-center text-rose-500 mb-6 border-2 border-rose-100 dark:border-rose-800 animate-pulse">

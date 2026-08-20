@@ -104,8 +104,15 @@ export const createEvent = ({
     contact2 = '',
     posterUrl = '',
     posterBlob = null,
+    posterUrls = [],
+    posterBlobs = [],
     website = '',
     registrationLink = '',
+    registrationLinks = [],
+    instagram = '',
+    linkedin = '',
+    twitter = '',
+    youtube = '',
     description = '',
     teamSize = 1,
     teamName = '',
@@ -147,8 +154,15 @@ export const createEvent = ({
         contact2,
         posterUrl,
         posterBlob,
+        posterUrls: Array.isArray(posterUrls) ? posterUrls : (posterUrl ? [posterUrl] : []),
+        posterBlobs: Array.isArray(posterBlobs) ? posterBlobs : (posterBlob ? [posterBlob] : []),
         website,
         registrationLink,
+        registrationLinks: Array.isArray(registrationLinks) ? registrationLinks : (registrationLink ? [{ label: 'Register', url: registrationLink }] : []),
+        instagram,
+        linkedin,
+        twitter,
+        youtube,
         description,
         teamSize,
         teamName,
@@ -333,8 +347,10 @@ export const addEvent = async (eventData) => {
     const event = createEvent(eventData);
     event.priorityScore = calculatePriorityScore(event);
 
-    const id = await db.events.add(event);
-    const result = { ...event, id };
+    const result = await db.transaction('rw', db.events, async () => {
+        const id = await db.events.add(event);
+        return { ...event, id };
+    });
 
     const state = useAppStore.getState();
     if (state.cloudProvider === 'firestore') {
@@ -348,18 +364,23 @@ export const addEvent = async (eventData) => {
 };
 
 export const updateEvent = async (id, updates) => {
-    const updated = { ...updates, updatedAt: new Date() };
-    if (updates.registrationDeadline || updates.startDate || updates.endDate ||
-        updates.prizeAmount || updates.registrationFee) {
+    const finalEvent = await db.transaction('rw', db.events, async () => {
         const event = await db.events.get(id);
-        const merged = { ...event, ...updates };
-        if (!updates.status && !MANUAL_STATUSES.includes(event.status)) {
-            updated.status = calculateStatus(merged.registrationDeadline, merged.startDate, merged.endDate);
+        if (!event) throw new Error("Event not found");
+
+        const updated = { ...updates, updatedAt: new Date() };
+        if (updates.registrationDeadline || updates.startDate || updates.endDate ||
+            updates.prizeAmount || updates.registrationFee) {
+            const merged = { ...event, ...updates };
+            if (!updates.status && !MANUAL_STATUSES.includes(event.status)) {
+                updated.status = calculateStatus(merged.registrationDeadline, merged.startDate, merged.endDate);
+            }
+            updated.priorityScore = calculatePriorityScore(merged);
         }
-        updated.priorityScore = calculatePriorityScore(merged);
-    }
-    await db.events.update(id, updated);
-    const finalEvent = await db.events.get(id);
+        await db.events.update(id, updated);
+        return await db.events.get(id);
+    });
+
     const state = useAppStore.getState();
     if (state.cloudProvider === 'firestore') {
         try {

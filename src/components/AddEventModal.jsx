@@ -21,28 +21,36 @@ const EventType = {
     OTHER: 'Other'
 };
 
-const PreviewImage = ({ blob, url: posterUrl }) => {
-    const [url, setUrl] = useState(null);
-
-    useEffect(() => {
-        if (blob instanceof Blob) {
-            const newUrl = URL.createObjectURL(blob);
-            setUrl(newUrl);
-            return () => URL.revokeObjectURL(newUrl);
-        } else if (posterUrl) {
-            setUrl(posterUrl);
-        } else {
-            setUrl(null);
-        }
-    }, [blob, posterUrl]);
-
-    if (!url) return null;
+const PosterPreviews = ({ blobs, urls, onRemoveBlob, onRemoveUrl }) => {
     return (
-        <div className="relative group rounded-2xl overflow-hidden shadow-xl border-2 border-white/20">
-            <img src={url} alt="Preview" className="h-40 w-full object-cover group-hover:scale-110 transition-transform duration-500" />
-            <div className="absolute inset-0 bg-black/20 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                <span className="text-[10px] font-black text-white uppercase tracking-widest bg-white/20 backdrop-blur-md px-3 py-1 rounded-full border border-white/30">Intelligence Scan Subject</span>
-            </div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 w-full p-2">
+            {blobs.map((blob, idx) => {
+                const url = blob instanceof Blob ? URL.createObjectURL(blob) : '';
+                return (
+                    <div key={`blob-${idx}`} className="relative group rounded-xl overflow-hidden shadow-md border border-slate-200 dark:border-slate-800">
+                        <img src={url} alt="Local Preview" className="h-20 w-full object-cover" />
+                        <button 
+                            type="button" 
+                            onClick={() => onRemoveBlob(idx)}
+                            className="absolute top-1 right-1 w-5 h-5 rounded-full bg-rose-600 text-white flex items-center justify-center text-[10px] font-black shadow-md hover:bg-rose-700"
+                        >
+                            &times;
+                        </button>
+                    </div>
+                );
+            })}
+            {urls.map((url, idx) => (
+                <div key={`url-${idx}`} className="relative group rounded-xl overflow-hidden shadow-md border border-slate-200 dark:border-slate-800">
+                    <img src={url} alt="Remote Preview" className="h-20 w-full object-cover" />
+                    <button 
+                        type="button" 
+                        onClick={() => onRemoveUrl(idx)}
+                        className="absolute top-1 right-1 w-5 h-5 rounded-full bg-rose-600 text-white flex items-center justify-center text-[10px] font-black shadow-md hover:bg-rose-700"
+                    >
+                        &times;
+                    </button>
+                </div>
+            ))}
         </div>
     );
 };
@@ -69,8 +77,15 @@ const AddEventModal = () => {
         contactNumbers: '',
         posterUrl: '',
         posterBlob: null,
+        posterUrls: [],
+        posterBlobs: [],
+        instagram: '',
+        linkedin: '',
+        twitter: '',
+        youtube: '',
         website: '',
         registrationLink: '',
+        registrationLinks: [{ label: 'Register', url: '' }],
         description: '',
         teamSize: '1',
         teamName: '',
@@ -80,6 +95,54 @@ const AddEventModal = () => {
         contact1: '',
         contact2: ''
     });
+
+    const [posterUrlInput, setPosterUrlInput] = useState('');
+
+    const handleAddPosterUrl = () => {
+        if (posterUrlInput.trim()) {
+            setFormData(prev => ({
+                ...prev,
+                posterUrls: [...prev.posterUrls, posterUrlInput.trim()]
+            }));
+            setPosterUrlInput('');
+        }
+    };
+
+    const handleRemovePosterUrl = (index) => {
+        setFormData(prev => ({
+            ...prev,
+            posterUrls: prev.posterUrls.filter((_, i) => i !== index)
+        }));
+    };
+
+    const handleRemovePosterBlob = (index) => {
+        setFormData(prev => ({
+            ...prev,
+            posterBlobs: prev.posterBlobs.filter((_, i) => i !== index)
+        }));
+    };
+
+    const handleRegLinkChange = (index, field, value) => {
+        setFormData(prev => {
+            const updated = [...prev.registrationLinks];
+            updated[index] = { ...updated[index], [field]: value };
+            return { ...prev, registrationLinks: updated };
+        });
+    };
+
+    const handleAddRegLink = () => {
+        setFormData(prev => ({
+            ...prev,
+            registrationLinks: [...prev.registrationLinks, { label: 'Register Link ' + (prev.registrationLinks.length + 1), url: '' }]
+        }));
+    };
+
+    const handleRemoveRegLink = (index) => {
+        setFormData(prev => ({
+            ...prev,
+            registrationLinks: prev.registrationLinks.filter((_, i) => i !== index)
+        }));
+    };
 
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -141,8 +204,13 @@ const AddEventModal = () => {
     };
 
     const handleFileChange = (e) => {
-        const file = e.target.files[0];
-        if (file) setFormData(prev => ({ ...prev, posterBlob: file }));
+        const files = Array.from(e.target.files);
+        if (files.length > 0) {
+            setFormData(prev => ({
+                ...prev,
+                posterBlobs: [...prev.posterBlobs, ...files]
+            }));
+        }
     };
 
     const handleChange = (e) => {
@@ -174,7 +242,7 @@ const AddEventModal = () => {
             };
             await addEvent(eventData);
             closeModal('addEvent');
-            setFormData({ collegeName: '', eventName: '', eventType: [EventType.HACKATHON], customEventType: '', registrationDeadline: '', startDate: '', endDate: '', prizeAmount: '', prizeWon: '', registrationFee: '', accommodation: false, location: '', isOnline: false, contactNumbers: '', posterUrl: '', posterBlob: null, website: '', registrationLink: '', description: '', teamSize: '1', teamName: '', eligibility: '', leader: '', members: '', contact1: '', contact2: '' });
+            setFormData({ collegeName: '', eventName: '', eventType: [EventType.HACKATHON], customEventType: '', registrationDeadline: '', startDate: '', endDate: '', prizeAmount: '', prizeWon: '', registrationFee: '', accommodation: false, location: '', isOnline: false, contactNumbers: '', posterUrl: '', posterBlob: null, posterUrls: [], posterBlobs: [], instagram: '', linkedin: '', twitter: '', youtube: '', website: '', registrationLink: '', registrationLinks: [{ label: 'Register', url: '' }], description: '', teamSize: '1', teamName: '', eligibility: '', leader: '', members: '', contact1: '', contact2: '' });
         } catch (error) {
             alert(`CRITICAL ERROR: ${error.message}`);
         } finally {
@@ -369,11 +437,14 @@ const AddEventModal = () => {
                                         </label>
                                     </div>
                                 </div>
-                                 <div className="form-group">
-                                    <label className="label-premium">Neural Link 0 (Poster URL)</label>
-                                    <div className="relative">
-                                        <ImageIcon className="absolute left-6 top-1/2 -translate-y-1/2 text-emerald-500" size={20} />
-                                        <input type="url" name="posterUrl" value={formData.posterUrl} onChange={handleChange} className="input-premium pl-16 text-emerald-600 font-black border-emerald-100 dark:border-emerald-900" placeholder="https://cdn.example.com/poster.jpg" />
+                                <div className="form-group">
+                                    <label className="label-premium">Add Poster URLs</label>
+                                    <div className="flex gap-2">
+                                        <div className="relative flex-1">
+                                            <ImageIcon className="absolute left-6 top-1/2 -translate-y-1/2 text-emerald-500" size={20} />
+                                            <input type="url" value={posterUrlInput} onChange={(e) => setPosterUrlInput(e.target.value)} className="input-premium pl-16 text-emerald-600 font-black border-emerald-100 dark:border-emerald-900" placeholder="https://cdn.example.com/poster.jpg" />
+                                        </div>
+                                        <button type="button" onClick={handleAddPosterUrl} className="px-6 bg-slate-900 text-white dark:bg-white dark:text-slate-900 font-black rounded-2xl text-xs uppercase tracking-widest hover:scale-105 active:scale-95 transition-all">Add URL</button>
                                     </div>
                                 </div>
                                 <div className="form-group">
@@ -384,10 +455,64 @@ const AddEventModal = () => {
                                     </div>
                                 </div>
                                 <div className="form-group">
-                                    <label className="label-premium">Registration Link</label>
-                                    <div className="relative">
-                                        <Globe className="absolute left-6 top-1/2 -translate-y-1/2 text-indigo-500" size={20} />
-                                        <input type="url" name="registrationLink" value={formData.registrationLink} onChange={handleChange} className="input-premium pl-16 text-indigo-600 font-black" placeholder="Google Form / Registration URL" />
+                                    <label className="label-premium">Registration Links</label>
+                                    <div className="space-y-2">
+                                        {formData.registrationLinks.map((link, idx) => (
+                                            <div key={idx} className="flex gap-2 items-center">
+                                                <input 
+                                                    type="text" 
+                                                    value={link.label} 
+                                                    onChange={(e) => handleRegLinkChange(idx, 'label', e.target.value)} 
+                                                    placeholder="e.g. Register Link" 
+                                                    className="input-premium flex-1" 
+                                                />
+                                                <input 
+                                                    type="url" 
+                                                    value={link.url} 
+                                                    onChange={(e) => handleRegLinkChange(idx, 'url', e.target.value)} 
+                                                    placeholder="URL" 
+                                                    className="input-premium flex-2" 
+                                                />
+                                                {formData.registrationLinks.length > 1 && (
+                                                    <button 
+                                                        type="button" 
+                                                        onClick={() => handleRemoveRegLink(idx)} 
+                                                        className="w-10 h-10 bg-rose-50 dark:bg-rose-950/20 text-rose-600 rounded-xl flex items-center justify-center hover:bg-rose-100"
+                                                    >
+                                                        <X size={16} />
+                                                    </button>
+                                                )}
+                                            </div>
+                                        ))}
+                                        <button 
+                                            type="button" 
+                                            onClick={handleAddRegLink} 
+                                            className="py-2 px-4 border border-indigo-600 text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-950/20 rounded-xl text-xs font-bold uppercase tracking-wider flex items-center gap-2 mt-1"
+                                        >
+                                            <Plus size={14} /> Add Link
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div className="col-span-1 md:col-span-2 border-t border-slate-100 dark:border-slate-800 pt-6">
+                                    <label className="label-premium mb-4 block">Social Media Links</label>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        <div className="form-group">
+                                            <label className="label-premium">Instagram URL</label>
+                                            <input type="url" name="instagram" value={formData.instagram} onChange={handleChange} className="input-premium" placeholder="Instagram Profile Link" />
+                                        </div>
+                                        <div className="form-group">
+                                            <label className="label-premium">LinkedIn URL</label>
+                                            <input type="url" name="linkedin" value={formData.linkedin} onChange={handleChange} className="input-premium" placeholder="LinkedIn Page Link" />
+                                        </div>
+                                        <div className="form-group">
+                                            <label className="label-premium">Twitter (X) URL</label>
+                                            <input type="url" name="twitter" value={formData.twitter} onChange={handleChange} className="input-premium" placeholder="Twitter Profile Link" />
+                                        </div>
+                                        <div className="form-group">
+                                            <label className="label-premium">YouTube URL</label>
+                                            <input type="url" name="youtube" value={formData.youtube} onChange={handleChange} className="input-premium" placeholder="YouTube Video / Channel Link" />
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -441,16 +566,23 @@ const AddEventModal = () => {
                                 <div className="space-y-6">
                                     <label className="label-premium">Event Poster AI Scan</label>
                                     <div className="bg-slate-50 dark:bg-slate-800/50 p-6 rounded-[2rem] border-2 border-dashed border-slate-200 dark:border-slate-800 flex flex-col items-center justify-center min-h-[250px] relative group overflow-hidden">
-                                        {(formData.posterBlob || formData.posterUrl) ? <PreviewImage blob={formData.posterBlob} url={formData.posterUrl} /> : (
+                                        {(formData.posterBlobs.length > 0 || formData.posterUrls.length > 0) ? (
+                                            <PosterPreviews 
+                                                blobs={formData.posterBlobs} 
+                                                urls={formData.posterUrls} 
+                                                onRemoveBlob={handleRemovePosterBlob} 
+                                                onRemoveUrl={handleRemovePosterUrl} 
+                                            />
+                                        ) : (
                                             <label className="flex flex-col items-center justify-center cursor-pointer w-full h-full p-8">
                                                 <Upload size={48} className="text-slate-300 mb-6 group-hover:text-indigo-600 group-hover:-translate-y-2 transition-all duration-500" />
-                                                <span className="text-[11px] font-black uppercase tracking-widest text-slate-500 mb-2">Upload Poster</span>
-                                                <span className="text-[10px] text-slate-400 font-bold">Image will be analyzed by AI</span>
-                                                <input type="file" className="hidden" onChange={handleFileChange} accept="image/*" />
+                                                <span className="text-[11px] font-black uppercase tracking-widest text-slate-500 mb-2">Upload Poster File(s)</span>
+                                                <span className="text-[10px] text-slate-400 font-bold">Select one or more poster files</span>
+                                                <input type="file" className="hidden" onChange={handleFileChange} accept="image/*" multiple />
                                             </label>
                                         )}
                                     </div>
-                                    <button type="button" onClick={handleAIAnalysis} disabled={isAnalyzing || (!formData.posterBlob && !formData.posterUrl)} className={cn("w-full h-16 rounded-2xl flex items-center justify-center gap-4 font-black uppercase text-[11px] tracking-[0.3em] transition-all shadow-2xl", isAnalyzing ? "bg-slate-100 text-slate-400" : "bg-gradient-to-r from-emerald-500 via-indigo-600 to-violet-700 text-white hover:scale-105 shadow-indigo-500/30")}>
+                                    <button type="button" onClick={handleAIAnalysis} disabled={isAnalyzing || (formData.posterBlobs.length === 0 && formData.posterUrls.length === 0)} className={cn("w-full h-16 rounded-2xl flex items-center justify-center gap-4 font-black uppercase text-[11px] tracking-[0.3em] transition-all shadow-2xl", isAnalyzing ? "bg-slate-100 text-slate-400" : "bg-gradient-to-r from-emerald-500 via-indigo-600 to-violet-700 text-white hover:scale-105 shadow-indigo-500/30")}>
                                         {isAnalyzing ? <div className="w-5 h-5 border-4 border-white border-t-transparent rounded-full animate-spin" /> : <><Sparkles size={20} /> Start AI Analysis</>}
                                     </button>
                                 </div>

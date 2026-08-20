@@ -36,9 +36,17 @@ import {
     createUserWithEmailAndPassword,
     updateProfile,
     signOut,
-    onAuthStateChanged
+    onAuthStateChanged,
+    GoogleAuthProvider,
+    signInWithPopup
 } from "firebase/auth";
 import { showNotification } from '../notifications';
+import { 
+    syncEventToSupabase, 
+    deleteEventFromSupabase, 
+    syncTeamEventDataToSupabase, 
+    syncProfileToSupabase 
+} from './databaseRouter';
 
 // These variables will hold our active instances once initialized
 export let db = null;   // Firestore instance
@@ -146,6 +154,44 @@ export const loginUser = async (email, password) => {
 };
 
 /**
+ * AUTH: Logs in / registers using Google OAuth.
+ */
+export const loginWithGoogle = async () => {
+    if (!auth) throw new Error("Firebase Auth not initialized. Check your config in Settings.");
+    const provider = new GoogleAuthProvider();
+    const result = await signInWithPopup(auth, provider);
+    
+    // Auto-provision profile on registration
+    if (db) {
+        const userRef = doc(db, "users", result.user.uid);
+        const userSnap = await getDoc(userRef);
+        if (!userSnap.exists()) {
+            const role = result.user.email === 'jagadish2k2006@gmail.com' ? 'admin' : 'public';
+            const profilePayload = {
+                email: result.user.email,
+                displayName: result.user.displayName || 'Anonymous Unit',
+                role: role,
+                mobile: '',
+                college: '',
+                department: '',
+                year: '',
+                section: '',
+                dob: '',
+                regNo: '',
+                locality: '',
+                professionalDetails: '',
+                photoURL: result.user.photoURL || '',
+                createdAt: new Date().toISOString()
+            };
+            await setDoc(userRef, profilePayload);
+            // Sync to Supabase Backup
+            await syncProfileToSupabase(result.user.uid, profilePayload);
+        }
+    }
+    return result;
+};
+
+/**
  * AUTH: Creates a new team account and sets their display name.
  */
 export const registerUser = async (email, password, displayName, extras = {}) => {
@@ -158,7 +204,7 @@ export const registerUser = async (email, password, displayName, extras = {}) =>
     // Create user document with default role "public"
     if (db) {
         const role = email === 'jagadish2k2006@gmail.com' ? 'admin' : 'public';
-        await setDoc(doc(db, "users", userCredential.user.uid), {
+        const profilePayload = {
             email: email,
             displayName: displayName,
             role: role,
@@ -173,7 +219,10 @@ export const registerUser = async (email, password, displayName, extras = {}) =>
             professionalDetails: extras.professionalDetails || '',
             photoURL: extras.photoURL || '',
             createdAt: new Date().toISOString()
-        });
+        };
+        await setDoc(doc(db, "users", userCredential.user.uid), profilePayload);
+        // Sync to Supabase Backup
+        await syncProfileToSupabase(userCredential.user.uid, profilePayload);
     }
 
     return userCredential;
@@ -262,7 +311,14 @@ export const subscribeToTeamMembers = (teamId, callback) => {
  */
 export const updateUserProfile = async (uid, data) => {
     if (!db) throw new Error("Firestore not initialized");
-    await setDoc(doc(db, "users", uid), data, { merge: true });
+    try {
+        await setDoc(doc(db, "users", uid), data, { merge: true });
+    } catch (e) {
+        console.error('[Sync Fail] Firestore updateUserProfile failed, falling back to Supabase:', e);
+        await syncProfileToSupabase(uid, data);
+        throw e;
+    }
+    await syncProfileToSupabase(uid, data);
 };
 
 /**
@@ -446,12 +502,20 @@ export const saveTeamEventData = async (teamId, eventId, data) => {
     const docId = `${teamId}_${eventId}`;
     const docRef = doc(db, "teamEventData", docId);
     
-    await setDoc(docRef, {
+    const payload = {
         ...data,
         teamId,
         eventId,
         updatedAt: new Date().toISOString()
-    }, { merge: true });
+    };
+    try {
+        await setDoc(docRef, payload, { merge: true });
+    } catch (e) {
+        console.error('[Sync Fail] Firestore saveTeamEventData failed, falling back to Supabase:', e);
+        await syncTeamEventDataToSupabase(teamId, eventId, data);
+        throw e;
+    }
+    await syncTeamEventDataToSupabase(teamId, eventId, data);
 };
 
 /**
@@ -483,7 +547,14 @@ export const saveEventToFirestore = async (event) => {
         }
     });
 
-    await setDoc(eventRef, cleanEvent);
+    try {
+        await setDoc(eventRef, cleanEvent);
+    } catch (e) {
+        console.error('[Sync Fail] Firestore setDoc failed, falling back to Supabase:', e);
+        await syncEventToSupabase(event);
+        throw e;
+    }
+    await syncEventToSupabase(event);
 };
 
 /**
@@ -491,7 +562,14 @@ export const saveEventToFirestore = async (event) => {
  */
 export const deleteEventFromFirestore = async (id) => {
     if (!db) throw new Error("Firestore not initialized");
-    await deleteDoc(doc(db, "events", id.toString()));
+    try {
+        await deleteDoc(doc(db, "events", id.toString()));
+    } catch (e) {
+        console.error('[Sync Fail] Firestore deleteDoc failed, falling back to Supabase:', e);
+        await deleteEventFromSupabase(id);
+        throw e;
+    }
+    await deleteEventFromSupabase(id);
 };
 
 /**

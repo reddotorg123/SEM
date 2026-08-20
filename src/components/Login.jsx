@@ -9,7 +9,7 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useAppStore } from '../store';
-import { loginUser, registerUser, initFirebase, getUserData } from '../services/firebase';
+import { loginUser, registerUser, initFirebase, getUserData, loginWithGoogle } from '../services/firebase';
 import { initNotificationSystem } from '../notifications';
 import { Shield, Lock, Mail, Loader2, AlertCircle } from 'lucide-react';
 
@@ -37,6 +37,40 @@ const Login = () => {
     const setUserRole = useAppStore((state) => state.setUserRole);
     const setCloudProvider = useAppStore((state) => state.setCloudProvider);
     const setUserProfile = useAppStore((state) => state.setUserProfile);
+
+    const handleGoogleLogin = async () => {
+        setError('');
+        setIsLoading(true);
+        try {
+            if (!firebaseConfig || !firebaseConfig.apiKey) {
+                throw new Error("Configuration Missing: Please go to Settings and paste your Firebase Project Config JSON first.");
+            }
+            initFirebase(firebaseConfig);
+            const userCredential = await loginWithGoogle();
+            setUser(userCredential.user);
+            
+            const userData = await getUserData(userCredential.user.uid);
+            setUserRole(userData.role);
+            setUserProfile(userData);
+            useAppStore.getState().setTeamId(userData.teamId);
+
+            initNotificationSystem().catch(err => console.error("Notification Init fail:", err));
+            setCloudProvider('firestore');
+
+            const pendingInvite = sessionStorage.getItem('pendingInvite');
+            if (pendingInvite) {
+                sessionStorage.removeItem('pendingInvite');
+                navigate(`/invite/${pendingInvite}`);
+            } else {
+                navigate('/');
+            }
+        } catch (err) {
+            console.error('Google Auth failure:', err);
+            setError(err.message || 'Google authentication failed.');
+        } finally {
+            setIsLoading(false);
+        }
+    };
 
     /**
      * Handles the authentication logic when the button is clicked.
@@ -221,6 +255,29 @@ const Login = () => {
                             ) : (
                                 isRegistering ? "Register Now" : "Secure Login"
                             )}
+                        </button>
+
+                        {/* Divider */}
+                        <div className="relative my-4 flex py-1 items-center">
+                            <div className="flex-grow border-t border-slate-200 dark:border-slate-800"></div>
+                            <span className="flex-shrink mx-4 text-slate-400 text-xs font-black uppercase tracking-widest">Or</span>
+                            <div className="flex-grow border-t border-slate-200 dark:border-slate-800"></div>
+                        </div>
+
+                        {/* Google Login Button */}
+                        <button
+                            type="button"
+                            onClick={handleGoogleLogin}
+                            disabled={isLoading}
+                            className="w-full h-14 border border-slate-200 dark:border-slate-800 dark:text-white bg-white/50 dark:bg-slate-900/50 hover:bg-slate-100 dark:hover:bg-slate-800/80 rounded-2xl flex items-center justify-center gap-3 font-bold transition-all active:scale-95"
+                        >
+                            <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24">
+                                <path fill="#EA4335" d="M12 5.04c1.66 0 3.2.57 4.38 1.69l3.27-3.27C17.67 1.47 14.98 1 12 1 7.35 1 3.39 3.65 1.5 7.5l3.85 2.99C6.27 7.54 8.91 5.04 12 5.04z" />
+                                <path fill="#4285F4" d="M23.49 12.27c0-.81-.07-1.59-.2-2.36H12v4.51h6.46c-.28 1.48-1.12 2.74-2.38 3.58l3.7 2.87c2.16-2 3.71-4.94 3.71-8.6z" />
+                                <path fill="#FBBC05" d="M5.35 10.49c-.24-.72-.38-1.49-.38-2.29s.14-1.57.38-2.29L1.5 2.92C.54 4.84 0 7.01 0 9.3c0 2.29.54 4.46 1.5 6.38l3.85-3.19z" />
+                                <path fill="#34A853" d="M12 23c3.24 0 5.97-1.07 7.96-2.91l-3.7-2.87c-1.03.69-2.35 1.1-4.26 1.1-3.09 0-5.73-2.5-6.65-5.45L1.5 16.07C3.39 19.92 7.35 23 12 23z" />
+                            </svg>
+                            Continue with Google
                         </button>
                     </form>
 

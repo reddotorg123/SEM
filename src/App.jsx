@@ -17,6 +17,8 @@ import { initNotificationSystem } from './notifications';
 import { initFirebase, getUserData, subscribeToUserData, subscribeToGlobalEvents, subscribeToTeamEventData } from './services/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { cn } from './utils';
+import { initSupabase } from './services/supabase';
+import { fetchBackupEvents, fetchBackupTeamEventData } from './services/databaseRouter';
 
 // --- EAGERLY LOADED COMPONENTS (Essential for fast first paint) ---
 import Header from './components/Header';
@@ -120,6 +122,7 @@ function App() {
     const user = useAppStore((state) => state.user);
     const setUser = useAppStore((state) => state.setUser);
     const firebaseConfig = useAppStore((state) => state.firebaseConfig);
+    const supabaseConfig = useAppStore((state) => state.supabaseConfig);
     const cloudProvider = useAppStore((state) => state.cloudProvider);
     const userRole = useAppStore((state) => state.userRole);
     const teamId = useAppStore((state) => state.teamId);
@@ -157,6 +160,15 @@ function App() {
             document.documentElement.classList.remove('dark');
         }
     }, [theme]);
+
+    /**
+     * EFFECT: Initialize Supabase client
+     */
+    useEffect(() => {
+        if (supabaseConfig && supabaseConfig.supabaseUrl) {
+            initSupabase(supabaseConfig);
+        }
+    }, [supabaseConfig]);
 
     /**
      * EFFECT: Initialize Firebase & Listen for Auth Changes
@@ -239,7 +251,15 @@ function App() {
             async (remoteEvents) => {
                 await bulkImportEvents(remoteEvents, true);
             },
-            (error) => console.error('[Sync] Global events failed:', error)
+            async (error) => {
+                console.warn('[Sync Fail] Global events sync failed, loading from Supabase fallback...', error);
+                try {
+                    const backupEvents = await fetchBackupEvents();
+                    await bulkImportEvents(backupEvents, true);
+                } catch (e) {
+                    console.error('[Sync Fail] Supabase fallback events read failed too:', e);
+                }
+            }
         );
 
         // 2. Sync Private Team Performance Data
@@ -249,7 +269,15 @@ function App() {
                 async (statsMap) => {
                     await bulkImportTeamEventData(statsMap, teamId);
                 },
-                (error) => console.error('[Sync] Team performance sync failed:', error)
+                async (error) => {
+                    console.warn('[Sync Fail] Team stats sync failed, loading from Supabase fallback...', error);
+                    try {
+                        const backupStats = await fetchBackupTeamEventData(teamId);
+                        await bulkImportTeamEventData(backupStats, teamId);
+                    } catch (e) {
+                        console.error('[Sync Fail] Supabase fallback team stats failed too:', e);
+                    }
+                }
             );
         }
 

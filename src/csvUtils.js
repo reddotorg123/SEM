@@ -1,5 +1,6 @@
 // CSV Import Utility using PapaParse
 import Papa from 'papaparse';
+import DOMPurify from 'dompurify';
 import { db, addEvent, updateEvent, EventType } from './db';
 
 // Column mapping configurations
@@ -62,10 +63,15 @@ export const parseDate = (dateStr) => {
     // Try DD/MM/YYYY or DD-MM-YYYY or MM/DD/YYYY
     const parts = dateStr.split(/[/-]/).map(p => parseInt(p, 10));
     if (parts.length === 3) {
+        let year = parts[2];
+        // Fix 2-digit year bug: 26 -> 2026, 99 -> 2099
+        if (year < 100) {
+            year += 2000;
+        }
         // Greedy attempt 1: DD/MM/YYYY
-        let d1 = new Date(parts[2], parts[1] - 1, parts[0]);
+        let d1 = new Date(year, parts[1] - 1, parts[0]);
         // Greedy attempt 2: MM/DD/YYYY
-        let d2 = new Date(parts[2], parts[0] - 1, parts[1]);
+        let d2 = new Date(year, parts[0] - 1, parts[1]);
 
         // If both are valid, pick the one that makes more sense (if day > 12, it must be DD/MM/YYYY)
         if (!isNaN(d1.getTime()) && parts[0] > 12) return d1;
@@ -164,11 +170,14 @@ export const transformRow = (row, columnMapping) => {
             case 'contact1':
             case 'contact2':
             case 'posterUrl':
-            case 'description':
             case 'eligibility':
             case 'website':
             case 'registrationLink':
                 event[field] = String(value).trim();
+                break;
+
+            case 'description':
+                event[field] = DOMPurify.sanitize(String(value).trim());
                 break;
 
             case 'status':
