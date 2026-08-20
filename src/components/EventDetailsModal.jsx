@@ -45,6 +45,8 @@ const PostersCarousel = ({ event }) => {
             const objectUrl = URL.createObjectURL(event.posterBlob);
             objectUrls.push(objectUrl);
             list.push(objectUrl);
+        } else if (typeof event.posterBlob === 'string' && event.posterBlob) {
+            list.push(resolveImageUrl(event.posterBlob));
         }
 
         // 2. Process URLs
