@@ -9,7 +9,7 @@ export const resolveImageUrl = (url) => {
     if (!url) return null;
 
     // Handle Google Drive sharing links
-    if (url.includes('drive.google.com') || url.includes('googleusercontent.com')) {
+    if (url.includes('drive.google.com') || url.includes('googleusercontent.com') || url.includes('docs.google.com')) {
         // match various formats: /d/ID, id=ID, file/d/ID/view, etc.
         const match = url.match(/\/d\/([a-zA-Z0-9_-]+)/) || 
                       url.match(/id=([a-zA-Z0-9_-]+)/) ||

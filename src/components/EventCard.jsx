@@ -42,26 +42,60 @@ const PosterImage = ({ event }) => {
     const [hasError, setHasError] = React.useState(false);
 
     React.useEffect(() => {
-        let objectUrl = null;
         setHasError(false); // Reset error state on new event/url
 
-        if (event.posterBlob instanceof Blob) {
-            objectUrl = URL.createObjectURL(event.posterBlob);
-            setImgSrc(objectUrl);
-        } else if (typeof event.posterBlob === 'string' && event.posterBlob) {
-            setImgSrc(resolveImageUrl(event.posterBlob));
-        } else if (event.posterUrl) {
-            setImgSrc(resolveImageUrl(event.posterUrl));
+        const list = [];
+        const objectUrls = [];
+
+        // 1. Process Blobs
+        if (Array.isArray(event.posterBlobs) && event.posterBlobs.length > 0) {
+            event.posterBlobs.forEach(blob => {
+                if (blob instanceof Blob) {
+                    const oUrl = URL.createObjectURL(blob);
+                    objectUrls.push(oUrl);
+                    list.push(oUrl);
+                } else if (typeof blob === 'string' && blob) {
+                    list.push(resolveImageUrl(blob));
+                }
+            });
+        }
+        if (event.posterBlob) {
+            if (event.posterBlob instanceof Blob) {
+                const oUrl = URL.createObjectURL(event.posterBlob);
+                objectUrls.push(oUrl);
+                list.push(oUrl);
+            } else if (typeof event.posterBlob === 'string') {
+                list.push(resolveImageUrl(event.posterBlob));
+            }
+        }
+
+        // 2. Process URLs
+        if (Array.isArray(event.posterUrls) && event.posterUrls.length > 0) {
+            event.posterUrls.forEach(url => {
+                if (url) {
+                    list.push(resolveImageUrl(url));
+                }
+            });
+        }
+        if (event.posterUrl) {
+            list.push(resolveImageUrl(event.posterUrl));
+        }
+
+        // Use the first valid image source
+        const firstImg = list.find(src => src);
+        if (firstImg) {
+            setImgSrc(firstImg);
         } else {
             setImgSrc(null);
         }
 
         return () => {
-            if (objectUrl) {
-                URL.revokeObjectURL(objectUrl);
-            }
+            // Revoke all created object URLs
+            objectUrls.forEach(url => {
+                URL.revokeObjectURL(url);
+            });
         };
-    }, [event.posterBlob, event.posterUrl]);
+    }, [event.posterBlobs, event.posterUrls, event.posterBlob, event.posterUrl]);
 
     if (!imgSrc || hasError) {
         return (
@@ -302,7 +336,7 @@ const EventCard = React.memo(({ event, compact = false }) => {
                         </div>
                     </div>
 
-                    {/* Leader / Contact Info — only visible when user is in a team */}
+                    {/* Leader / Contact Info ï¿½ only visible when user is in a team */}
                     {isInTeam && (
                     <div className="flex items-center gap-2">
                         <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg sm:rounded-xl bg-violet-50 dark:bg-violet-900/20 flex items-center justify-center shrink-0">
@@ -351,3 +385,4 @@ const EventCard = React.memo(({ event, compact = false }) => {
 });
 
 export default EventCard;
+

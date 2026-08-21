@@ -31,7 +31,7 @@ const PostersCarousel = ({ event }) => {
         const objectUrls = [];
 
         // 1. Process Blobs
-        if (Array.isArray(event.posterBlobs)) {
+        if (Array.isArray(event.posterBlobs) && event.posterBlobs.length > 0) {
             event.posterBlobs.forEach(blob => {
                 if (blob instanceof Blob) {
                     const objectUrl = URL.createObjectURL(blob);
@@ -41,23 +41,38 @@ const PostersCarousel = ({ event }) => {
                     list.push(resolveImageUrl(blob));
                 }
             });
-        } else if (event.posterBlob instanceof Blob) {
-            const objectUrl = URL.createObjectURL(event.posterBlob);
-            objectUrls.push(objectUrl);
-            list.push(objectUrl);
-        } else if (typeof event.posterBlob === 'string' && event.posterBlob) {
-            list.push(resolveImageUrl(event.posterBlob));
+        }
+        if (event.posterBlob) {
+            if (event.posterBlob instanceof Blob) {
+                const objectUrl = URL.createObjectURL(event.posterBlob);
+                objectUrls.push(objectUrl);
+                if (!list.includes(objectUrl)) {
+                    list.push(objectUrl);
+                }
+            } else if (typeof event.posterBlob === 'string') {
+                const resolved = resolveImageUrl(event.posterBlob);
+                if (resolved && !list.includes(resolved)) {
+                    list.push(resolved);
+                }
+            }
         }
 
         // 2. Process URLs
-        if (Array.isArray(event.posterUrls)) {
+        if (Array.isArray(event.posterUrls) && event.posterUrls.length > 0) {
             event.posterUrls.forEach(url => {
-                if (url && !list.includes(url)) {
-                    list.push(resolveImageUrl(url));
+                if (url) {
+                    const resolved = resolveImageUrl(url);
+                    if (resolved && !list.includes(resolved)) {
+                        list.push(resolved);
+                    }
                 }
             });
-        } else if (event.posterUrl && !list.includes(event.posterUrl)) {
-            list.push(resolveImageUrl(event.posterUrl));
+        }
+        if (event.posterUrl) {
+            const resolved = resolveImageUrl(event.posterUrl);
+            if (resolved && !list.includes(resolved)) {
+                list.push(resolved);
+            }
         }
 
         setImages(list);
@@ -729,3 +744,4 @@ const EventDetailsModal = () => {
 };
 
 export default EventDetailsModal;
+
