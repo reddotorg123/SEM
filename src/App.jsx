@@ -18,7 +18,7 @@ import { initFirebase, getUserData, subscribeToUserData, subscribeToGlobalEvents
 import { onAuthStateChanged } from 'firebase/auth';
 import { cn } from './utils';
 import { initSupabase } from './services/supabase';
-import { fetchBackupEvents, fetchBackupTeamEventData } from './services/databaseRouter';
+import { fetchBackupEvents, fetchBackupTeamEventData, bulkSyncEventsToSupabase } from './services/databaseRouter';
 
 // --- EAGERLY LOADED COMPONENTS (Essential for fast first paint) ---
 import Header from './components/Header';
@@ -134,6 +134,7 @@ function App() {
     // Local loading states
     const [isLoading, setIsLoading] = useState(true);
     const [showSplash, setShowSplash] = useState(true);
+    const hasInitialSupabaseSyncRun = React.useRef(false);
 
     /**
      * EFFECT: Safety Timeout
@@ -250,6 +251,12 @@ function App() {
         unsubscribeGlobal = subscribeToGlobalEvents(
             async (remoteEvents) => {
                 await bulkImportEvents(remoteEvents, true);
+                if (!hasInitialSupabaseSyncRun.current && remoteEvents.length > 0) {
+                    hasInitialSupabaseSyncRun.current = true;
+                    bulkSyncEventsToSupabase(remoteEvents).catch(err => {
+                        console.error('[Supabase Auto-Sync Failed]:', err);
+                    });
+                }
             },
             async (error) => {
                 console.warn('[Sync Fail] Global events sync failed, loading from Supabase fallback...', error);

@@ -255,3 +255,63 @@ export const fetchBackupTeamEventData = async (teamId) => {
         return {};
     }
 };
+
+/**
+ * Bulk sync all events to Supabase at once using a single batch upsert.
+ */
+export const bulkSyncEventsToSupabase = async (events) => {
+    const supabase = getSupabase();
+    if (!supabase || !events || events.length === 0) return;
+
+    const payloads = events.map(event => ({
+        server_id: event.serverId,
+        college_name: event.collegeName,
+        event_name: event.eventName,
+        event_type: Array.isArray(event.eventType) ? event.eventType : [event.eventType],
+        registration_deadline: event.registrationDeadline instanceof Date ? event.registrationDeadline.toISOString() : event.registrationDeadline,
+        start_date: event.startDate instanceof Date ? event.startDate.toISOString() : event.startDate,
+        end_date: event.endDate instanceof Date ? event.endDate.toISOString() : event.endDate,
+        prize_amount: parseFloat(event.prizeAmount) || 0,
+        registration_fee: parseFloat(event.registrationFee) || 0,
+        accommodation: !!event.accommodation,
+        location: event.location || '',
+        is_online: !!event.isOnline,
+        contact_numbers: event.contactNumbers || [],
+        contact1: event.contact1 || '',
+        contact2: event.contact2 || '',
+        poster_urls: event.posterUrls || (event.posterUrl ? [event.posterUrl] : []),
+        website: event.website || '',
+        registration_links: event.registrationLinks || (event.registrationLink ? [{ label: 'Register', url: event.registrationLink }] : []),
+        instagram: event.instagram || '',
+        linkedin: event.linkedin || '',
+        twitter: event.twitter || '',
+        youtube: event.youtube || '',
+        description: event.description || '',
+        team_size: parseInt(event.teamSize) || 1,
+        team_name: event.teamName || '',
+        eligibility: event.eligibility || '',
+        leader: event.leader || '',
+        members: event.members || '',
+        no_of_teams: event.noOfTeams || '',
+        prize_won: parseFloat(event.prizeWon) || 0,
+        status: event.status,
+        priority_score: parseFloat(event.priorityScore) || 0,
+        team_id: event.teamId || null,
+        created_by: event.createdBy || 'unknown',
+        created_at: event.createdAt instanceof Date ? event.createdAt.toISOString() : event.createdAt,
+        updated_at: event.updatedAt instanceof Date ? event.updatedAt.toISOString() : (event.updatedAt || new Date().toISOString())
+    }));
+
+    try {
+        const { error } = await supabase
+            .from('events')
+            .upsert(payloads, { onConflict: 'server_id' });
+
+        if (error) throw error;
+        await logSystemEvent('INFO', 'SYNC', `Bulk synced ${events.length} events to Supabase`);
+        console.log(`[Supabase Backup] Successfully bulk-synced ${events.length} events.`);
+    } catch (err) {
+        await logSystemEvent('ERROR', 'SYNC', `Failed bulk sync to Supabase: ${err.message}`);
+        console.error('[Supabase Backup] Bulk sync failed:', err.message);
+    }
+};
