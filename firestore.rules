@@ -7,94 +7,140 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    function isOwner(uid) {
-      return request.auth.uid == uid;
+    function isOwner(userId) {
+      return request.auth.uid == userId;
     }
 
+    // Safely get user document fields without failing on null
     function getUserData() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
-    }
-
-    function hasRole(role) {
-      return isSignedIn() && getUserData().role == role;
+      return exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data
+        : {"role": "public", "teamId": null};
     }
 
     function isAdmin() {
-      return hasRole('admin');
+      return getUserData().role == "admin";
     }
 
     function isEventManager() {
-      return hasRole('event_manager') || isAdmin();
+      return getUserData().role == "event_manager" || isAdmin();
     }
 
-    function isSubscriber() {
-      return hasRole('subscriber') || hasRole('member') || isEventManager();
+    function getTeamId() {
+      return getUserData().teamId;
     }
 
-    function isSameTeam(teamId) {
-      return isSignedIn() && getUserData().teamId == teamId;
-    }
-
-    // --------- Global Events (shared catalog) ---------
+    // --------- Global & Personal Events ---------
     match /events/{eventId} {
       allow read: if isSignedIn();
-      // Only admins and event managers can create/edit/delete global events
-      allow create, update, delete: if isEventManager();
+      allow create: if isSignedIn();
+      allow update, delete: if isEventManager() || (resource != null && resource.data.createdBy == request.auth.uid);
     }
 
     // --------- Users ---------
     match /users/{userId} {
-      // Users can read their own doc; admins and event managers can read all
-      allow read: if isOwner(userId) || isEventManager();
-      // Users can update their own profile; admins can update any
-      allow update: if isOwner(userId) || isAdmin();
-      allow create: if isOwner(userId);
-      allow delete: if isAdmin();
+      allow read: if isSignedIn();
+      allow create: if isOwner(userId) && (
+                      request.resource.data.role == "public" || 
+                      (request.resource.data.email == "jagadish2k2006@gmail.com" && request.resource.data.role == "admin")
+                    );
+      
+      allow update: if isAdmin() || (
+                      isOwner(userId) && (
+                        // Protect roles and emails from self-modification
+                        request.resource.data.get('role', 'public') == resource.data.get('role', 'public') &&
+                        request.resource.data.get('email', '') == resource.data.get('email', '')
+                      )
+                    ) || (
+                      // (A) Team leader updating member position
+                      isSignedIn() && 
+                      resource.data.get('teamId', '') == request.auth.uid && 
+                      request.resource.data.diff(resource.data).affectedKeys().hasOnly(['position'])
+                    ) || (
+                      // (B) Team leader inducting a member (approving join request)
+                      isSignedIn() &&
+                      request.resource.data.get('teamId', '') == request.auth.uid &&
+                      request.resource.data.get('role', '') == 'member' &&
+                      (resource.data.get('teamId', '') == userId || resource.data.get('teamId', '') == '') &&
+                      request.resource.data.diff(resource.data).affectedKeys().hasOnly(['teamId', 'role'])
+                    ) || (
+                      // (C) Team leader removing a member or disbanding (demoting role and resetting teamId)
+                      isSignedIn() &&
+                      resource.data.get('teamId', '') == request.auth.uid &&
+                      request.resource.data.get('teamId', '') == userId &&
+                      request.resource.data.get('position', '') == 'Explorer' &&
+                      (request.resource.data.get('role', 'public') == 'public' || request.resource.data.get('role', 'public') == resource.data.get('role', 'public')) &&
+                      request.resource.data.diff(resource.data).affectedKeys().hasOnly(['teamId', 'position', 'role'])
+                    );
 
-      // -- Personal per-event prize stats --
-      match /eventStats/{eventId} {
-        // Only the owner can read/write their own event stats
-        allow read, write: if isOwner(userId);
-      }
+      allow delete: if isAdmin();
     }
 
     // --------- Team Event Data (private performance stats) ---------
-    match /teamEventData/{teamEventId} {
-      allow read: if isSignedIn() && (isSameTeam(resource.data.teamId) || isAdmin());
-      allow create, update: if isSignedIn() && (isSameTeam(request.resource.data.teamId) || isAdmin());
-      allow delete: if isAdmin();
+    match /teamEventData/{docId} {
+      function isMemberOfTeam(targetTeamId) {
+        return targetTeamId == request.auth.uid || targetTeamId == getTeamId();
+      }
+
+      allow read: if isSignedIn() && (isMemberOfTeam(resource.data.teamId) || isAdmin());
+      allow create: if isSignedIn() && isMemberOfTeam(request.resource.data.teamId);
+      allow update: if isSignedIn() && isMemberOfTeam(resource.data.teamId);
+      allow delete: if isAdmin() || (isSignedIn() && isMemberOfTeam(resource.data.teamId));
     }
 
     // --------- Team Join Requests ---------
     match /team_requests/{requestId} {
-      allow read: if isSignedIn() &&
-        (resource.data.userId == request.auth.uid ||
-         resource.data.teamId == request.auth.uid ||
-         isAdmin());
-      // Any signed-in user can create a request (for themselves)
+      allow read: if isSignedIn() && (
+        resource.data.userId == request.auth.uid ||
+        resource.data.teamId == request.auth.uid ||
+        isAdmin()
+      );
       allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
-      // Only the team leader (teamId == uid) or admin can update/delete
-      allow update, delete: if isSignedIn() &&
-        (resource.data.teamId == request.auth.uid || isAdmin());
+      allow update, delete: if isSignedIn() && (
+        resource.data.teamId == request.auth.uid || 
+        isAdmin()
+      );
     }
 
-    // --------- Team Messages ---------
+    // --------- Team Messages (Chat Board) ---------
     match /team_messages/{messageId} {
-      allow read: if isSignedIn() && isSameTeam(resource.data.teamId);
-      allow create: if isSignedIn() && isSameTeam(request.resource.data.teamId)
-                       && request.resource.data.senderId == request.auth.uid;
-      allow delete: if isAdmin();
+      function isMemberOfTeam(tid) {
+        return tid == request.auth.uid || tid == getTeamId();
+      }
+      
+      // Data-level security: Users can only read messages from their own team
+      allow read: if isSignedIn() && (resource.data.teamId == request.auth.uid || resource.data.teamId == getTeamId() || isAdmin());
+      allow create: if isSignedIn() && isMemberOfTeam(request.resource.data.teamId);
+      allow update, delete: if isAdmin() || (resource != null && resource.data.senderId == request.auth.uid);
+    }
+
+    // --------- Individual Notes ---------
+    match /notes/{noteId} {
+      allow read, write: if isSignedIn() && (
+        (resource != null && resource.data.createdBy == request.auth.uid) ||
+        (request.resource != null && request.resource.data.createdBy == request.auth.uid)
+      );
+    }
+
+    // --------- Colleges ---------
+    match /colleges/{collegeId} {
+      allow read: if isSignedIn();
+      allow write: if isEventManager();
     }
 
     // --------- Payment Requests ---------
     match /payment_requests/{requestId} {
-      // User can read their own; admin/event_manager can read all
-      allow read: if isSignedIn() &&
-        (resource.data.userId == request.auth.uid || isEventManager());
-      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
-      // Only admins can approve/reject payments
-      allow update: if isAdmin();
-      allow delete: if isAdmin();
+      allow create: if isSignedIn() && 
+                    request.resource.data.userId == request.auth.uid && 
+                    request.resource.data.status == "pending";
+      allow read: if isAdmin() || (resource != null && resource.data.userId == request.auth.uid);
+      allow update, delete: if isAdmin();
+    }
+
+    // --------- System Settings ---------
+    match /settings/{settingId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
     }
   }
 }
